@@ -7,6 +7,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.database.init_db import init_database
+from app.seed.seed_all import seed_all
 
 settings = get_settings()
 
@@ -58,4 +59,7 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 @app.on_event("startup")
 def on_startup() -> None:
-    init_database()
+    if settings.SEED_DEMO_DATA:
+        seed_all()
+    else:
+        init_database()

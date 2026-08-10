@@ -22,7 +22,6 @@ services:
     plan: free
     region: oregon
     healthCheckPath: /api/health
-    preDeployCommand: python -m app.seed.seed_all
     envVars:
       - key: DATABASE_URL
         fromDatabase:
