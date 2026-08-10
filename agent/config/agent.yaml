@@ -1,7 +1,7 @@
-# CRPF Sentinel Windows Agent configuration
+# CyberRakshak Windows Agent configuration
 #
 # Every setting can also be provided as an environment variable using the
-# SENTINEL_* prefix (e.g. SENTINEL_API_TOKEN, SENTINEL_SERVER_URL).
+# CYBERRAKSHAK_* prefix (e.g. CYBERRAKSHAK_API_TOKEN, CYBERRAKSHAK_SERVER_URL).
 # Env vars override this file.
 
 agent_id: "WIN-AGT-0001"

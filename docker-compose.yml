@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: crpf-sentinel-db
+    container_name: cyberrakshak-db
     environment:
       POSTGRES_USER: sentinel
       POSTGRES_PASSWORD: sentinel_dev_password
@@ -20,7 +20,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: crpf-sentinel-api
+    container_name: cyberrakshak-api
     env_file:
       - .env
     environment:
@@ -31,24 +31,36 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyberrakshak-seed
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://sentinel:sentinel_dev_password@postgres:5432/sentinel
+      APP_ENV: docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    command: ["python", "-m", "app.seed.seed_all"]
+    restart: "no"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: crpf-sentinel-ui
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: cyberrakshak-ui
     ports:
       - "3000:3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
 
 volumes:
   pgdata:

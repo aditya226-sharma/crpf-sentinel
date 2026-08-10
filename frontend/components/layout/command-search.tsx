@@ -180,7 +180,7 @@ export function CommandSearch({
         <div className="flex items-center gap-3 border-t border-border px-4 py-2 text-[10px] text-muted">
           <span className="flex items-center gap-1"><kbd className="rounded border border-border bg-surface2 px-1 font-mono">↑↓</kbd> Navigate</span>
           <span className="flex items-center gap-1"><kbd className="rounded border border-border bg-surface2 px-1 font-mono">↵</kbd> Open</span>
-          <span className="ml-auto text-muted/70">CRPF SENTINEL · Global Search</span>
+          <span className="ml-auto text-muted/70">CyberRakshak · Global Search</span>
         </div>
       </DialogContent>
     </Dialog>

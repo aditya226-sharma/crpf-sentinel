@@ -138,7 +138,7 @@ function LoginForm() {
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-foreground">Authorized Access Only</h2>
             <p className="mt-1 text-sm text-muted">
-              Sign in with your Sentinel credentials. All access is audited.
+              Sign in with your CyberRakshak credentials. All access is audited.
             </p>
           </div>
 
@@ -220,7 +220,7 @@ function LoginForm() {
         </div>
 
         <p className="mt-10 text-center text-[10px] uppercase tracking-[0.25em] text-slate-600">
-          CRPF Sentinel · Restricted Network
+          CyberRakshak · Restricted Network
         </p>
       </div>
     </div>

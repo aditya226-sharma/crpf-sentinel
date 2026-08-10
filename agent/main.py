@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""CRPF Sentinel Windows Collector Agent — entrypoint.
+"""CyberRakshak Windows Collector Agent — entrypoint.
 
 Usage:
     python -m main [--config config/agent.yaml]
 
-Environment variables (SENTINEL_*) override the YAML config, which
+Environment variables (CYBERRAKSHAK_*) override the YAML config, which
 overrides built-in defaults. See config/agent.yaml.example.
 """
 
@@ -22,16 +22,16 @@ from config.settings import Settings
 from parser.windows import normalize
 from spool.spool import Spool
 from transport import Transport
-from utils import os_info, system_metrics
+from utils import local_ip, os_info, system_metrics
 
-log = logging.getLogger("sentinel")
+log = logging.getLogger("cyberrakshak")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
 
-class SentinelAgent:
+class CyberRakshakAgent:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._stop = threading.Event()
@@ -47,14 +47,14 @@ class SentinelAgent:
         signal.signal(signal.SIGTERM, self._on_signal)
 
         log.info(
-            "Sentinel agent v%s starting | agent=%s server=%s mode=%s",
+            "CyberRakshak agent v%s starting | agent=%s server=%s mode=%s",
             "1.0.0",
             self.settings.agent_id,
             self.settings.server_url,
             "simulated" if self.settings.simulate else "windows-evtlog",
         )
         if not self.settings.api_token:
-            log.warning("SENTINEL_API_TOKEN is empty — server will reject requests")
+            log.warning("CYBERRAKSHAK_API_TOKEN is empty — server will reject requests")
 
         last_heartbeat = 0.0
         while not self._stop.is_set():
@@ -123,7 +123,7 @@ class SentinelAgent:
         spool_mb = self.spool.size_mb
         metrics = {
             "hostname": self.settings.effective_hostname,
-            "ip_address": self.settings.effective_hostname,
+            "ip_address": local_ip(),
             "os_version": self._os_info["os_version"],
             "agent_version": "1.0.0",
             "events_per_sec": int(self._stats["collected"] / max(1, self.settings.metrics_interval_seconds)),
@@ -137,7 +137,7 @@ class SentinelAgent:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="CRPF Sentinel Windows Collector Agent")
+    parser = argparse.ArgumentParser(description="CyberRakshak Windows Collector Agent")
     parser.add_argument("--config", default=None, help="path to agent YAML config")
     parser.add_argument("--simulate", action="store_true", help="force simulated events")
     args = parser.parse_args()
@@ -147,9 +147,9 @@ def main() -> None:
         settings.simulate = True
 
     if not settings.agent_id:
-        raise SystemExit("agent_id is required (SENTINEL_AGENT_ID)")
+        raise SystemExit("agent_id is required (CYBERRAKSHAK_AGENT_ID)")
 
-    SentinelAgent(settings).run()
+    CyberRakshakAgent(settings).run()
 
 
 if __name__ == "__main__":

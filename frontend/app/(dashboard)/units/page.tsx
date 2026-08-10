@@ -18,7 +18,7 @@ export default function UnitsPage() {
     <div>
       <PageHeader
         title="Units"
-        description="Deployed CRPF units enrolled in the Sentinel network."
+        description="Deployed CRPF units enrolled in the CyberRakshak network."
       />
 
       {isLoading && <PageLoading rows={8} />}

@@ -1,7 +1,7 @@
 """Normalization for Windows Event Log records.
 
 Transforms raw records (XML, WMI dicts, or JSON) into the compact
-``IngestItem`` shape expected by the Sentinel backend.
+``IngestItem`` shape expected by the CyberRakshak backend.
 """
 
 from __future__ import annotations

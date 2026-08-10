@@ -63,7 +63,7 @@ export default function SettingsPage() {
               <KeyRound className="h-4 w-4 text-accent" />
               Change Password
             </CardTitle>
-            <CardDescription>Rotate your Sentinel credentials. All changes are audited.</CardDescription>
+            <CardDescription>Rotate your CyberRakshak credentials. All changes are audited.</CardDescription>
           </CardHeader>
           <CardContent>
             {user?.role?.name === "super_admin" && (

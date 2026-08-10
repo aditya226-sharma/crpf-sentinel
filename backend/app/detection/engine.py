@@ -80,6 +80,7 @@ def _run_rule(db: Session, rule: DetectionRule, event: dict) -> Alert | None:
     correlated_success = event["event_id"] == 4624 and rule.correlation_type == "sequence"
 
     open_alert = _find_open_alert(db, rule, event, corr_value)
+    alert_created = open_alert is None
     now = datetime.now(timezone.utc)
     risk_score, risk_factors = compute_risk_score(
         severity=rule.severity,
@@ -152,21 +153,22 @@ def _run_rule(db: Session, rule: DetectionRule, event: dict) -> Alert | None:
         )
 
     db.commit()
-    publish(
-        "alert",
-        {
-            "alert_id": alert.alert_id,
-            "id": alert.id,
-            "title": alert.title,
-            "severity": alert.severity,
-            "rule_id": rule.rule_id,
-            "unit_id": alert.unit_id,
-            "hostname": alert.hostname,
-            "source_ip": alert.source_ip,
-            "status": alert.status,
-            "risk_score": alert.risk_score,
-        },
-    )
+    if alert_created:
+        publish(
+            "alert",
+            {
+                "alert_id": alert.alert_id,
+                "id": alert.id,
+                "title": alert.title,
+                "severity": alert.severity,
+                "rule_id": rule.rule_id,
+                "unit_id": alert.unit_id,
+                "hostname": alert.hostname,
+                "source_ip": alert.source_ip,
+                "status": alert.status,
+                "risk_score": alert.risk_score,
+            },
+        )
     return alert
 
 

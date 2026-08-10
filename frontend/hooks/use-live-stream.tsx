@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { getToken } from "@/lib/api";
 import { API_URL } from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
 import type { LiveEventItem } from "@/types";
 
 export type ConnectionState = "connecting" | "live" | "reconnecting" | "offline";
@@ -25,6 +25,7 @@ const LiveStreamContext = createContext<LiveStreamContextValue | null>(null);
 const MAX_EVENTS = 200;
 
 export function LiveStreamProvider({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [events, setEvents] = useState<LiveEventItem[]>([]);
   const [lastEvent, setLastEvent] = useState<LiveEventItem | null>(null);
@@ -33,6 +34,8 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
   const controllerRef = useRef<AbortController | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventsRef = useRef<LiveEventItem[]>([]);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
   const appendEvent = useCallback((event: LiveEventItem) => {
     eventsRef.current = [event, ...eventsRef.current].slice(0, MAX_EVENTS);
@@ -47,8 +50,8 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const connect = useCallback(() => {
-    const token = getToken();
-    if (!token) {
+    const authToken = tokenRef.current;
+    if (!authToken) {
       setConnection("offline");
       return;
     }
@@ -62,7 +65,7 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
         const response = await fetch(url, {
           headers: {
             Accept: "text/event-stream",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${authToken}`,
           },
           signal: controller.signal,
         });
@@ -123,7 +126,7 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
       controllerRef.current?.abort();
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     };
-  }, [connect]);
+  }, [connect, token]);
 
   const value = useMemo<LiveStreamContextValue>(
     () => ({

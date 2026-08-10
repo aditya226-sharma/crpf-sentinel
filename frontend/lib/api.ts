@@ -1,8 +1,8 @@
 "use client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const TOKEN_KEY = "sentinel_token";
-const USER_KEY = "sentinel_user";
+const TOKEN_KEY = "cyberrakshak_token";
+const USER_KEY = "cyberrakshak_user";
 
 export class ApiError extends Error {
   code: string;

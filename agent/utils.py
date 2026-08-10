@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import platform
+import socket
 
 try:
     import psutil  # type: ignore
@@ -24,3 +25,20 @@ def system_metrics() -> dict:
 
 def os_info() -> dict:
     return {"os_version": platform.platform()}
+
+
+def local_ip() -> str:
+    """Best-effort primary outbound IPv4 address.
+
+    Opens a UDP socket (no packets sent) purely to discover the interface
+    used to reach the network. Falls back to the loopback address.
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+        finally:
+            sock.close()
+    except Exception:
+        return "127.0.0.1"

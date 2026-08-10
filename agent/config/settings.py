@@ -1,7 +1,7 @@
 """Agent configuration: environment variables + optional YAML overlay.
 
 Configuration precedence:
-1. Environment variables (SENTINEL_*)
+1. Environment variables (CYBERRAKSHAK_*)
 2. YAML config file (config/agent.yaml)
 3. Built-in defaults
 """
@@ -77,7 +77,7 @@ class Settings:
                 break
 
         def get(name: str, default):
-            env = os.environ.get(f"SENTINEL_{name.upper()}")
+            env = os.environ.get(f"CYBERRAKSHAK_{name.upper()}")
             if env is not None:
                 return env
             if name in file_data:

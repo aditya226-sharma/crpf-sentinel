@@ -71,7 +71,7 @@ export default function LogsPage() {
         })
         .join(","),
     );
-    downloadText(`sentinel-events-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join("\n"), "text/csv");
+    downloadText(`cyberrakshak-events-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...rows].join("\n"), "text/csv");
   }
 
   return (

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Core
-    APP_NAME: str = "CRPF Sentinel"
+    APP_NAME: str = "CyberRakshak"
     APP_VERSION: str = "1.0.0"
     APP_ENV: str = "development"
     API_PREFIX: str = "/api"
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Seeding
     SEED_DEMO_DATA: bool = True
     SEED_ADMIN_USERNAME: str = "admin"
-    SEED_ADMIN_EMAIL: str = "admin@sentinel.crpf.demo"
+    SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
     SEED_ADMIN_PASSWORD: str = "Sentinel@123"
 
     @property

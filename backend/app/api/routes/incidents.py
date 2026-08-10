@@ -415,10 +415,16 @@ def incident_events(
         .join(IncidentAlert, IncidentAlert.alert_id == AlertEvent.alert_id)
         .filter(IncidentAlert.incident_id == inc.id)
         .order_by(NormalizedEvent.timestamp.desc())
-        .distinct(NormalizedEvent.id)
         .limit(limit)
         .all()
     )
+    seen: set[int] = set()
+    unique: list = []
+    for e in rows:
+        if e.id in seen:
+            continue
+        seen.add(e.id)
+        unique.append(e)
     return [
         {
             "id": e.id,

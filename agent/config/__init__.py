@@ -1,4 +1,4 @@
-"""Sentinel agent configuration."""
+"""CyberRakshak agent configuration."""
 
 from config.settings import Settings
 

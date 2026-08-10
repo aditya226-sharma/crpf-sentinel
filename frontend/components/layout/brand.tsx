@@ -25,7 +25,7 @@ export function Brand({ className, collapsed }: { className?: string; collapsed?
       {!collapsed && (
         <div className="flex flex-col leading-none">
           <span className="text-sm font-bold tracking-widest text-foreground">
-            CRPF<span className="text-accent"> SENTINEL</span>
+            Cyber<span className="text-accent">Rakshak</span>
           </span>
           <span className="text-[9px] font-medium uppercase tracking-[0.25em] text-muted">
             Security Operations

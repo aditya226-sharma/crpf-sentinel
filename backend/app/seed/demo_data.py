@@ -133,7 +133,7 @@ def seed_demo_users(db: Session, units: dict[str, Unit], roles) -> list[User]:
         analyst = User(
             id=uuid.uuid4().hex[:16],
             username="analyst",
-            email="analyst@sentinel.crpf.demo",
+            email="analyst@cyberrakshak.demo",
             full_name="Security Analyst",
             password_hash=hash_password("Analyst@123"),
             role_id=roles["security_expert"].id,
@@ -145,7 +145,7 @@ def seed_demo_users(db: Session, units: dict[str, Unit], roles) -> list[User]:
         unit_admin = User(
             id=uuid.uuid4().hex[:16],
             username="unitadmin",
-            email="unitadmin@sentinel.crpf.demo",
+            email="unitadmin@cyberrakshak.demo",
             full_name="Delhi Unit Administrator",
             password_hash=hash_password("UnitAdmin@123"),
             role_id=roles["unit_admin"].id,

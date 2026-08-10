@@ -1,4 +1,4 @@
-"""HTTPS transport to the Sentinel backend.
+"""HTTPS transport to the CyberRakshak backend.
 
 Batches spooled events into ``POST /api/ingest`` requests authenticated with
 the agent bearer token, with exponential backoff and retries. Periodic
@@ -13,7 +13,7 @@ import time
 
 import requests
 
-log = logging.getLogger("sentinel.transport")
+log = logging.getLogger("cyberrakshak.transport")
 
 
 class Transport:

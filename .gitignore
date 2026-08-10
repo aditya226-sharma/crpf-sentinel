@@ -28,3 +28,4 @@ agent/spool/*.jsonl
 
 # OS
 .DS_Store
+*.tsbuildinfo

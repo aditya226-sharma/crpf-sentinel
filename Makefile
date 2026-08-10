@@ -18,8 +18,8 @@ frontend: ## Run frontend locally
 seed: ## Seed demo data + rules
 	cd backend && python -m app.seed.seed_all
 
-simulate: ## Run demo attack scenario 1 (brute force)
-	cd backend && python -m app.simulation.run 1
+simulate: ## Run demo attack scenario (brute_force)
+	cd backend && python -m app.simulation.run brute_force
 
-agent: ## Run the Windows collector agent (needs SENTINEL_API_TOKEN)
-	cd agent && pip install -r requirements.txt && SENTINEL_API_TOKEN="$(AGENT_API_TOKEN)" python -m main --simulate
+agent: ## Run the Windows collector agent (needs CYBERRAKSHAK_API_TOKEN)
+	cd agent && pip install -r requirements.txt && CYBERRAKSHAK_API_TOKEN="$(AGENT_API_TOKEN)" python -m main --simulate

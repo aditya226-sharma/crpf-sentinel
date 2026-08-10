@@ -106,6 +106,14 @@ _EVENT_TEMPLATES = [
 ]
 
 
+def _escape_xml(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
 class SimulatedEventReader:
     """Generates synthetic Windows-style events for demos and development."""
 
@@ -130,12 +138,18 @@ class SimulatedEventReader:
         event_id, provider, _, data, outcome = self.rng.choice(_EVENT_TEMPLATES)
         ts = datetime.now(timezone.utc) - timedelta(seconds=self.rng.random() * 8)
         host = self.rng.choice(self._hosts)
+        event_data = "".join(
+            f"<Data Name=\"{name}\">{_escape_xml(str(value))}</Data>"
+            for name, value in data.items()
+            if value is not None
+        )
         raw_xml = (
             f'<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event" '
             f'xmlns:q="http://schemas.microsoft.com/win/2004/08/events/event">'
             f"<System><Provider Name=\"{provider}\"/><EventID>{event_id}</EventID>"
             f"<Computer>{host}</Computer><TimeCreated SystemTime=\"{ts.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]}Z\"/>"
-            f"</System><EventData></EventData></Event>"
+            f"<Security UserID=\"S-1-5-18\"/></System>"
+            f"<EventData>{event_data}</EventData></Event>"
         )
         return {
             "event_id": event_id,

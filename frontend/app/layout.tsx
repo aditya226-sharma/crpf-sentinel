@@ -16,10 +16,10 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CRPF SENTINEL — Centralized IT System Log Analysis & Threat Detection Platform",
+  title: "CyberRakshak — Centralized IT System Log Analysis & Threat Detection Platform",
   description:
     "Centralized Security Operations for CRPF: SIEM-grade Windows Event Log monitoring, threat detection, alerting, and incident response across distributed units.",
-  applicationName: "CRPF SENTINEL",
+  applicationName: "CyberRakshak",
   icons: {
     icon: "/shield.svg",
   },

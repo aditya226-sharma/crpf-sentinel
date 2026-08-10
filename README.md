@@ -1,4 +1,4 @@
-# CRPF SENTINEL
+# CyberRakshak
 
 A Security Information and Event Management (SIEM) platform for Central
 Reserve Police Force (CRPF) units — submitted for **Smart India Hackathon
@@ -77,7 +77,7 @@ npm run dev                        # http://localhost:3000
 cd agent
 pip install -r requirements.txt
 # register an agent in the web UI (Agents → Register) and copy its token:
-SENTINEL_API_TOKEN=<token> python -m main --simulate
+CYBERRAKSHAK_API_TOKEN=<token> python -m main --simulate
 ```
 
 Or with the Makefile:
@@ -128,18 +128,18 @@ Backend (`.env`, see `backend/.env.example`):
 | `SEED_ADMIN_USERNAME`     | `admin`                  | seeded super-admin             |
 | `SEED_ADMIN_PASSWORD`     | `Sentinel@123`           | seeded password                |
 
-Agent (`SENTINEL_*` env vars override `agent/config/agent.yaml`):
+Agent (`CYBERRAKSHAK_*` env vars override `agent/config/agent.yaml`):
 
 | Variable                    | Default                | Notes                          |
 |-----------------------------|------------------------|--------------------------------|
-| `SENTINEL_SERVER_URL`       | `http://localhost:8000`| backend base URL               |
-| `SENTINEL_API_TOKEN`        | _(empty)_              | from agent registration (x-agent-token) |
-| `SENTINEL_AGENT_ID`         | `WIN-AGT-0001`         | must match the registered agent|
-| `SENTINEL_SIMULATE`         | `true`                 | fake events for dev/demo       |
-| `SENTINEL_CHANNELS`         | Security,System,App    | Windows channels to read       |
-| `SENTINEL_POLL_INTERVAL_SECONDS` | `5`             | collect/flush cadence          |
-| `SENTINEL_MAX_BATCH`        | `200`                  | events per ingest request (≤2000) |
-| `SENTINEL_SPOOL_DIR`        | `spool`                | offline JSONL buffer           |
+| `CYBERRAKSHAK_SERVER_URL`   | `http://localhost:8000`| backend base URL               |
+| `CYBERRAKSHAK_API_TOKEN`    | _(empty)_              | from agent registration (x-agent-token) |
+| `CYBERRAKSHAK_AGENT_ID`     | `WIN-AGT-0001`         | must match the registered agent|
+| `CYBERRAKSHAK_SIMULATE`     | `true`                 | fake events for dev/demo       |
+| `CYBERRAKSHAK_CHANNELS`     | Security,System,App    | Windows channels to read       |
+| `CYBERRAKSHAK_POLL_INTERVAL_SECONDS` | `5`             | collect/flush cadence          |
+| `CYBERRAKSHAK_MAX_BATCH`    | `200`                  | events per ingest request (≤2000) |
+| `CYBERRAKSHAK_SPOOL_DIR`    | `spool`                | offline JSONL buffer           |
 
 ---
 

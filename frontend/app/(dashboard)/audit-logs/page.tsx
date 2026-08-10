@@ -37,7 +37,7 @@ export default function AuditLogsPage() {
     <div>
       <PageHeader
         title="Audit Trail"
-        description="Immutable record of privileged actions across the Sentinel platform."
+        description="Immutable record of privileged actions across the CyberRakshak platform."
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface p-3">

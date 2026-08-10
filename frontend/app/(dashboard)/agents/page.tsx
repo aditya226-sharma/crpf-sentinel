@@ -48,7 +48,7 @@ export default function AgentsPage() {
     <div>
       <PageHeader
         title="Windows Agents"
-        description="Endpoints streaming Windows Event Logs to Sentinel."
+        description="Endpoints streaming Windows Event Logs to CyberRakshak."
         actions={
           can("agents.manage") && (
             <Button size="sm" onClick={() => setRegistering(true)}>
