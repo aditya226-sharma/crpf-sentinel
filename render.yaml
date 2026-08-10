@@ -1,0 +1,46 @@
+# Render Blueprint — CyberRakshak backend (FastAPI + Postgres)
+#
+# Import this repo on Render (Dashboard → New → Blueprint) and it provisions
+# a free Postgres database + the FastAPI web service automatically.
+#
+# The frontend lives on Vercel; add the Vercel app URL to BACKEND_CORS_ORIGINS
+# below (comma-separated) so the browser can call this API.
+
+databases:
+  - name: cyberrakshak-postgres
+    databaseName: cyberrakshak
+    user: cyberrakshak
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: cyberrakshak-api
+    runtime: docker
+    repo: https://github.com/aditya226-sharma/crpf-sentinel
+    rootDir: backend
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    preDeployCommand: python -m app.seed.seed_all
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cyberrakshak-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: SEED_ADMIN_USERNAME
+        value: admin
+      - key: SEED_ADMIN_EMAIL
+        value: admin@cyberrakshak.demo
+      - key: SEED_ADMIN_PASSWORD
+        value: Sentinel@123
+      - key: BACKEND_CORS_ORIGINS
+        value: https://cyberrakshak.vercel.app,https://cyberrakshak-frontend.vercel.app
