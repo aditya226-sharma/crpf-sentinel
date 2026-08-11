@@ -45,7 +45,13 @@ def seed_all(include_demo: bool | None = None) -> dict:
 
         result: dict = {"rules": rules_seeded}
         if include_demo:
-            demo = seed_demo_data(db, units, agents)
+            from app.models.event import NormalizedEvent
+
+            already_seeded = db.query(NormalizedEvent.id).first() is not None
+            if already_seeded:
+                demo = {"events_created": 0, "attack_bursts": 0}
+            else:
+                demo = seed_demo_data(db, units, agents)
             result.update(demo)
         iocs = seed_iocs(db)
         incidents = seed_demo_incidents(db)
