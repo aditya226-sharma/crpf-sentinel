@@ -84,16 +84,16 @@ def seed_demo_incidents(db: Session) -> int:
         },
         {
             "incident_id": "INC-DEMO-002",
-            "title": "Brute Force Attack on Delhi Unit",
+            "title": "Credential Compromise — Brute Force Followed by Successful Logon",
             "category": "authentication",
-            "rule_substring": "RULE-AUTH-001",
-            "severity": "high",
+            "rule_substring": "RULE-AUTH-002",
+            "severity": "critical",
             "status": "investigating",
             "description": (
-                "Multiple failed logon events targeting the Delhi unit were "
-                "observed from a small set of external source addresses over "
-                "a short time window. This pattern is consistent with a "
-                "password spray or brute force campaign."
+                "A host recorded multiple failed logon attempts followed by "
+                "a successful logon from the same source. This sequence "
+                "strongly suggests the account credentials were compromised "
+                "during a brute force attack."
             ),
         },
         {
@@ -175,6 +175,48 @@ def seed_demo_incidents(db: Session) -> int:
                 "Unexpected group membership changes can indicate privilege "
                 "escalation or a compromised account being leveraged for "
                 "further access."
+            ),
+        },
+        {
+            "incident_id": "INC-DEMO-009",
+            "title": "Repeated Failed Logons on Remote Unit — Password Spraying",
+            "category": "authentication",
+            "rule_substring": "RULE-AUTH-002",
+            "severity": "high",
+            "status": "investigating",
+            "description": (
+                "An elevated rate of failed logon events was observed on "
+                "hosts in a remote unit. The volume and timing are "
+                "consistent with a password spraying campaign rather than "
+                "individual user error."
+            ),
+        },
+        {
+            "incident_id": "INC-DEMO-010",
+            "title": "Persistence via New Service on Remote Unit",
+            "category": "service_installation",
+            "rule_substring": "RULE-SVC-001",
+            "severity": "high",
+            "status": "investigating",
+            "description": (
+                "A service was installed on a remote unit host outside of "
+                "change control. Persistence mechanisms such as service "
+                "installation allow attackers to survive reboots and "
+                "maintain a foothold on the network."
+            ),
+        },
+        {
+            "incident_id": "INC-DEMO-011",
+            "title": "Multiple New Accounts on Same Host",
+            "category": "account",
+            "rule_substring": "RULE-ACCT-001",
+            "severity": "medium",
+            "status": "closed",
+            "description": (
+                "Several new user accounts were created on the same host "
+                "within a short window. Review confirmed these were "
+                "provisioned as part of a legitimate batch onboarding task. "
+                "Incident closed as informational."
             ),
         },
     ]
