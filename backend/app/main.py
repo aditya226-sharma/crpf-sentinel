@@ -71,9 +71,9 @@ async def on_startup() -> None:
 
         logging.getLogger("cyberrakshak.startup").exception("startup seeding failed: %s", exc)
     if settings.SEED_DEMO_DATA:
-        from app.seed.seed_all import purge_future_demo_events
+        from app.seed.seed_all import purge_future_demo_data
 
-        app.state.repair_task = asyncio.create_task(asyncio.to_thread(purge_future_demo_events))
+        app.state.repair_task = asyncio.create_task(asyncio.to_thread(purge_future_demo_data))
         from app.simulation.live import start_live_demo
 
         app.state.live_demo_task = asyncio.create_task(start_live_demo())

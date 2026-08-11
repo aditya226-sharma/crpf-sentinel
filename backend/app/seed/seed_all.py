@@ -29,68 +29,102 @@ from app.seed.soc import seed_demo_incidents, seed_iocs
 settings = get_settings()
 
 
-def _purge_future_demo_events(db: Session) -> dict:
-    """Repair demo timestamps on an existing database.
+def _purge_future_demo_data(db: Session) -> dict:
+    """Repair corrupt demo data from older seed versions.
 
-    Older seed versions could write events with timestamps in the future
+    Old seeds could write alerts/events/logs with timestamps in the future
     (``day.replace(hour=...)`` on "today"), which made them permanently sort
-    as the "most recent" events. Future-dated bulk events not linked to any
-    alert are removed (their log back-reference is nulled first to avoid the
-    circular logs<->events FK); any remaining future-dated events (attack
-    bursts referenced by alerts) are clamped to now. Best-effort: never
+    as the "most recent" rows and pushed unit risk scores to the max. The
+    flood alerts (and their alert<->event links) are removed first, then
+    future-dated events not linked to any remaining alert are removed (their
+    log back-reference is nulled first to avoid the circular logs<->events
+    FK), orphan future logs are dropped, and any remaining future-dated
+    events (referenced by kept alerts) are clamped to now.
+
+    Runs with bounded statements (lock/statement timeouts on Postgres) and
+    chunked deletes so it can never wedge a deploy. Best-effort: never
     raises, rolls back on failure. Returns counts.
     """
     import logging
 
     from datetime import datetime, timezone
 
-    from sqlalchemy import select
+    from sqlalchemy import delete, or_, select, text, update
 
-    from app.models.alert import AlertEvent
+    from app.models.alert import Alert, AlertEvent
     from app.models.event import NormalizedEvent
+    from app.models.incident import IncidentAlert
     from app.models.log import Log
 
     logger = logging.getLogger("cyberrakshak.seed")
     now = datetime.now(timezone.utc)
     try:
-        referenced = select(AlertEvent.normalized_event_id).where(
-            AlertEvent.normalized_event_id.isnot(None)
-        )
-        orphan = select(NormalizedEvent.id).where(
-            NormalizedEvent.timestamp > now,
-            NormalizedEvent.id.notin_(referenced),
-        )
-        removed = db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(orphan)).count()
-        if removed:
-            db.query(Log).filter(Log.normalized_event_id.in_(orphan)).update(
-                {Log.normalized_event_id: None}, synchronize_session=False
+        for stmt in ("SET lock_timeout = '30s'", "SET statement_timeout = '120s'"):
+            try:
+                db.execute(text(stmt))
+            except Exception:  # noqa: BLE001 - no-op on non-Postgres engines
+                pass
+
+        future_alert_ids = [
+            r[0]
+            for r in db.execute(
+                select(Alert.id).where(or_(Alert.first_seen > now, Alert.last_seen > now)).limit(2000)
             )
-            db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(orphan)).delete(
-                synchronize_session=False
+        ]
+        removed_alerts = len(future_alert_ids)
+        for i in range(0, len(future_alert_ids), 400):
+            chunk = future_alert_ids[i : i + 400]
+            db.execute(delete(IncidentAlert).where(IncidentAlert.alert_id.in_(chunk)))
+            db.execute(delete(AlertEvent).where(AlertEvent.alert_id.in_(chunk)))
+            db.execute(delete(Alert).where(Alert.id.in_(chunk)))
+
+        referenced = select(AlertEvent.normalized_event_id)
+        orphan_ids = [
+            r[0]
+            for r in db.execute(
+                select(NormalizedEvent.id)
+                .where(
+                    NormalizedEvent.timestamp > now,
+                    NormalizedEvent.id.notin_(referenced),
+                )
+                .limit(20000)
             )
-            db.query(Log).filter(
-                Log.normalized_event_id.is_(None), Log.received_at > now
-            ).delete(synchronize_session=False)
-        clamped = (
-            db.query(NormalizedEvent)
-            .filter(NormalizedEvent.timestamp > now)
-            .update({NormalizedEvent.timestamp: now}, synchronize_session=False)
+        ]
+        removed_events = len(orphan_ids)
+        for i in range(0, len(orphan_ids), 400):
+            chunk = orphan_ids[i : i + 400]
+            db.execute(
+                update(Log)
+                .where(Log.normalized_event_id.in_(chunk))
+                .values(normalized_event_id=None)
+            )
+            db.execute(delete(NormalizedEvent).where(NormalizedEvent.id.in_(chunk)))
+
+        db.execute(
+            delete(Log).where(Log.normalized_event_id.is_(None), Log.received_at > now)
         )
+        clamped = db.execute(
+            update(NormalizedEvent).where(NormalizedEvent.timestamp > now).values(timestamp=now)
+        ).rowcount
         db.commit()
-        result = {"events_removed": removed, "events_clamped": clamped}
-    except Exception as exc:  # noqa: BLE001 - startup must never fail on repair
+        result = {
+            "alerts_removed": removed_alerts,
+            "events_removed": removed_events,
+            "events_clamped": clamped,
+        }
+    except Exception as exc:  # noqa: BLE001 - repair must never break the app
         db.rollback()
-        result = {"events_removed": 0, "events_clamped": 0, "error": str(exc)}
-        logger.warning("purge of future-dated demo events failed: %s", exc)
-    logger.info("purged future-dated demo events: %s", result)
+        result = {"alerts_removed": 0, "events_removed": 0, "events_clamped": 0, "error": str(exc)}
+        logger.warning("purge of future-dated demo data failed: %s", exc)
+    logger.info("purged future-dated demo data: %s", result)
     return result
 
 
-def purge_future_demo_events() -> dict:
+def purge_future_demo_data() -> dict:
     """Run the future-timestamp repair on its own session (post-startup)."""
     db: Session = SessionLocal()
     try:
-        return _purge_future_demo_events(db)
+        return _purge_future_demo_data(db)
     finally:
         db.close()
 
@@ -102,7 +136,6 @@ def seed_all(include_demo: bool | None = None) -> dict:
     init_database()
     db: Session = SessionLocal()
     try:
-        repaired = _purge_future_demo_events(db)
         roles = seed_roles(db)
         admin = db.query(User).filter(User.username == settings.SEED_ADMIN_USERNAME).first()
         rules_seeded = seed_rules(db, created_by=admin)
@@ -124,7 +157,6 @@ def seed_all(include_demo: bool | None = None) -> dict:
         incidents = seed_demo_incidents(db)
         result["iocs_seeded"] = iocs
         result["incidents_seeded"] = incidents
-        result["repair"] = repaired
         db.commit()
         return result
     finally:

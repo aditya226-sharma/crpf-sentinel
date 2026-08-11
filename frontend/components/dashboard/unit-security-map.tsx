@@ -38,8 +38,8 @@ function project(lat: number, lon: number): [number, number] {
 function nodeStyle(u: UnitOverviewItem): { color: string; label: string } {
   const risk = u.risk ?? 0;
   if (u.status === "offline") return { color: "#64748B", label: "OFFLINE" };
-  if (u.status === "warning" || risk >= 60) return { color: "#EF4444", label: "CRITICAL ALERT" };
-  if (risk >= 35) return { color: "#F59E0B", label: "WARNING" };
+  if (risk >= 60 || u.status === "critical") return { color: "#EF4444", label: "CRITICAL ALERT" };
+  if (risk >= 35 || u.status === "warning") return { color: "#F59E0B", label: "WARNING" };
   return { color: "#22C55E", label: "NORMAL" };
 }
 
