@@ -165,7 +165,9 @@ def seed_all(include_demo: bool | None = None) -> dict:
         if include_demo:
             from app.models.event import NormalizedEvent
 
-            already_seeded = db.query(NormalizedEvent.id).first() is not None
+            already_seeded = (
+                db.query(NormalizedEvent.id).count() >= 5000
+            )
             if already_seeded:
                 demo = {"events_created": 0, "attack_bursts": 0}
             else:
