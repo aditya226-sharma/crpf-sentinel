@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.models.agent import Agent
 from app.models.alert import Alert
 from app.models.incident import Incident, IncidentAlert, IncidentNote
 from app.models.ioc import IocEntry
@@ -286,6 +287,101 @@ def seed_demo_incidents(db: Session) -> int:
             )
         )
         created += 1
+
+    # Ensure every unit that has a unit_admin-role account owns at least one
+    # incident, so scoped users (e.g. unitadmin -> UNIT-01) see case data too.
+    scoped_unit_ids = {
+        u.unit_id
+        for u in db.query(User).filter(User.unit_id.isnot(None)).all()
+        if u.role and u.role.name == "unit_admin"
+    }
+    covered = {inc.unit_id for inc in db.query(Incident).all()}
+    unit_templates = [
+        {
+            "prefix": "INC-DEMO-101",
+            "title": "IOC Match — Suspicious Outbound Beaconing",
+            "category": "ioc",
+            "severity": "high",
+            "status": "investigating",
+            "description": (
+                "A host in this unit matched a known indicator of compromise "
+                "associated with command-and-control beaconing. Review the "
+                "linked alerts for the offending process and network details."
+            ),
+        },
+        {
+            "prefix": "INC-DEMO-102",
+            "title": "Malicious Script Execution on Unit Host",
+            "category": "execution",
+            "severity": "high",
+            "status": "triaging",
+            "description": (
+                "Suspicious script execution was detected on a host in this "
+                "unit. The behaviour matches known attacker tooling and "
+                "should be investigated as a possible initial foothold."
+            ),
+        },
+    ]
+    for uid in sorted(scoped_unit_ids - covered):
+        alerts = (
+            db.query(Alert)
+            .filter(Alert.unit_id == uid)
+            .order_by(Alert.last_seen.desc())
+            .limit(8)
+            .all()
+        )
+        for spec in unit_templates:
+            incident_id = f"{spec['prefix']}-{uid[:4]}"
+            if db.query(Incident).filter(Incident.incident_id == incident_id).first():
+                continue
+            first = alerts[-1] if alerts else None
+            last = alerts[0] if alerts else None
+            status = spec["status"]
+            agent = None
+            if first is None:
+                agent = (
+                    db.query(Agent)
+                    .filter(Agent.unit_id == uid)
+                    .order_by(Agent.hostname)
+                    .first()
+                )
+            incident = Incident(
+                id=uuid.uuid4().hex[:16],
+                incident_id=incident_id,
+                title=spec["title"],
+                description=spec["description"],
+                severity=spec["severity"],
+                status=status,
+                category=spec["category"],
+                source="correlation",
+                unit_id=uid,
+                hostname=first.hostname if first else (agent.hostname if agent else None),
+                source_ip=first.source_ip if first else None,
+                username=first.username if first else None,
+                mitre_technique=first.mitre_technique if first else None,
+                mitre_name=first.mitre_name if first else None,
+                alert_count=len(alerts),
+                event_count=sum(a.event_count or 0 for a in alerts),
+                risk_score=max((a.risk_score or 0) for a in alerts) if alerts else 35,
+                assigned_to=created_by,
+                created_by=created_by,
+                first_seen=first.first_seen if first else now - timedelta(days=1),
+                last_seen=last.last_seen if last else now - timedelta(hours=1),
+            )
+            db.add(incident)
+            db.flush()
+            for a in alerts:
+                db.add(IncidentAlert(incident_id=incident.id, alert_id=a.id, timestamp=now))
+            db.add(
+                IncidentNote(
+                    incident_id=incident.id,
+                    user_id=created_by,
+                    username=admin.username if admin else "system",
+                    content="Incident auto-created during demo seeding. Review linked alerts and timeline.",
+                    timestamp=now,
+                )
+            )
+            created += 1
 
     db.commit()
     return created
