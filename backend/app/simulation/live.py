@@ -21,6 +21,8 @@ logger = logging.getLogger("cyberrakshak.live")
 INTERVAL_SECONDS = 4
 BURST_PROBABILITY = 0.3
 
+_unit_cursor = 0
+
 USERS = ["administrator", "s.verma", "a.singh", "n.rao", "p.malhotra", "r.tiwari"]
 SOURCES = ["203.0.113.77", "198.51.100.33", "192.0.2.101", "10.20.1.15", "10.40.3.88"]
 
@@ -46,9 +48,15 @@ _SUSPICIOUS_EVENTS = [
 
 
 def _generate_batch() -> None:
+    global _unit_cursor
     db = SessionLocal()
     try:
-        agents = db.query(Agent).all()
+        unit_ids = [row[0] for row in db.query(Unit.id).all()]
+        if not unit_ids:
+            return
+        uid = unit_ids[_unit_cursor % len(unit_ids)]
+        _unit_cursor += 1
+        agents = db.query(Agent).filter(Agent.unit_id == uid).all()
         if not agents:
             return
         rng = random.Random()
