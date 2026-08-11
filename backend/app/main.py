@@ -1,5 +1,7 @@
 """CyberRakshak — FastAPI application entrypoint."""
 
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -58,8 +60,19 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 
 @app.on_event("startup")
-def on_startup() -> None:
+async def on_startup() -> None:
     if settings.SEED_DEMO_DATA:
         seed_all()
     else:
         init_database()
+    if settings.SEED_DEMO_DATA:
+        from app.simulation.live import start_live_demo
+
+        app.state.live_demo_task = asyncio.create_task(start_live_demo())
+
+
+@app.on_event("shutdown")
+async def on_shutdown() -> None:
+    task = getattr(app.state, "live_demo_task", None)
+    if task is not None:
+        task.cancel()

@@ -78,6 +78,23 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
         setConnection("live");
         reconnectAttempt.current = 0;
 
+        if (eventsRef.current.length === 0) {
+          try {
+            const recent = await fetch(`${API_URL}/api/dashboard/live-events?limit=20`, {
+              headers: { Authorization: `Bearer ${authToken}` },
+            });
+            if (recent.ok) {
+              const items = (await recent.json()) as LiveEventItem[];
+              if (items.length > 0 && eventsRef.current.length === 0) {
+                eventsRef.current = items;
+                setEvents(items);
+              }
+            }
+          } catch {
+            /* recent-events prefill is best-effort */
+          }
+        }
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
