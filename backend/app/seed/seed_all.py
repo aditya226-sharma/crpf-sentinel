@@ -59,7 +59,7 @@ def _purge_future_demo_data(db: Session) -> dict:
     logger = logging.getLogger("cyberrakshak.seed")
     now = datetime.now(timezone.utc)
     try:
-        for stmt in ("SET lock_timeout = '30s'", "SET statement_timeout = '120s'"):
+        for stmt in ("SET lock_timeout = '300s'", "SET statement_timeout = '300s'"):
             try:
                 db.execute(text(stmt))
             except Exception:  # noqa: BLE001 - no-op on non-Postgres engines
@@ -121,12 +121,30 @@ def _purge_future_demo_data(db: Session) -> dict:
 
 
 def purge_future_demo_data() -> dict:
-    """Run the future-timestamp repair on its own session (post-startup)."""
-    db: Session = SessionLocal()
-    try:
-        return _purge_future_demo_data(db)
-    finally:
-        db.close()
+    """Run the future-timestamp repair on its own session (post-startup).
+
+    Waits briefly so the instance is settled, then retries a few times so
+    transient lock contention (e.g. a draining old instance) does not keep
+    the repair from completing.
+    """
+    import logging
+    import time
+
+    logger = logging.getLogger("cyberrakshak.seed")
+    time.sleep(20)
+    attempt = 1
+    while attempt <= 3:
+        db: Session = SessionLocal()
+        try:
+            result = _purge_future_demo_data(db)
+        finally:
+            db.close()
+        if "error" not in result or attempt >= 3:
+            return result
+        logger.warning("purge attempt %d failed (%s); retrying", attempt, result["error"])
+        attempt += 1
+        time.sleep(60)
+    return result
 
 
 def seed_all(include_demo: bool | None = None) -> dict:
