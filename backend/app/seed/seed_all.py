@@ -29,6 +29,49 @@ from app.seed.soc import seed_demo_incidents, seed_iocs
 settings = get_settings()
 
 
+def _purge_future_demo_events(db: Session) -> dict:
+    """Repair demo timestamps on existing databases.
+
+    Older seed versions could write events with timestamps in the future
+    (``day.replace(hour=...)`` on "today"), which made them permanently sort
+    as the "most recent" events. Bulk events not linked to alerts are removed
+    (with their raw logs); any remaining future-dated events (attack bursts
+    referenced by alerts) are clamped to now. Returns counts of removed and
+    clamped events.
+    """
+    from datetime import datetime, timezone
+
+    from app.models.alert import AlertEvent
+    from app.models.event import NormalizedEvent
+    from app.models.log import Log
+
+    now = datetime.now(timezone.utc)
+    referenced = set(
+        rid
+        for (rid,) in db.query(AlertEvent.normalized_event_id).filter(AlertEvent.normalized_event_id.isnot(None)).all()
+    )
+    orphan_ids = [
+        (eid,)
+        for (eid,) in db.query(NormalizedEvent.id)
+        .filter(NormalizedEvent.timestamp > now)
+        .filter(NormalizedEvent.id.notin_(referenced) if referenced else True)
+        .all()
+    ]
+    removed = len(orphan_ids)
+    if orphan_ids:
+        flat = [i for (i,) in orphan_ids]
+        db.query(Log).filter(Log.normalized_event_id.in_(flat)).delete(synchronize_session=False)
+        db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(flat)).delete(synchronize_session=False)
+
+    clamped = (
+        db.query(NormalizedEvent)
+        .filter(NormalizedEvent.timestamp > now)
+        .update({NormalizedEvent.timestamp: now}, synchronize_session=False)
+    )
+    db.commit()
+    return {"events_removed": removed, "events_clamped": clamped}
+
+
 def seed_all(include_demo: bool | None = None) -> dict:
     if include_demo is None:
         include_demo = settings.SEED_DEMO_DATA
@@ -36,6 +79,7 @@ def seed_all(include_demo: bool | None = None) -> dict:
     init_database()
     db: Session = SessionLocal()
     try:
+        repaired = _purge_future_demo_events(db)
         roles = seed_roles(db)
         admin = db.query(User).filter(User.username == settings.SEED_ADMIN_USERNAME).first()
         rules_seeded = seed_rules(db, created_by=admin)
@@ -57,6 +101,7 @@ def seed_all(include_demo: bool | None = None) -> dict:
         incidents = seed_demo_incidents(db)
         result["iocs_seeded"] = iocs
         result["incidents_seeded"] = incidents
+        result["repair"] = repaired
         db.commit()
         return result
     finally:

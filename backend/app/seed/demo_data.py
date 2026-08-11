@@ -168,6 +168,8 @@ def _bulk_normal_event(
     source_ip: str | None,
     command_line: str | None = None,
 ):
+    now = datetime.now(timezone.utc)
+    when = min(when, now)
     category, action, severity = EVENT_CLASSIFICATION.get(event_id, ("unknown", "observed", "informational"))
     payload = _structured_payload(
         event_id, agent.hostname, when,
@@ -219,8 +221,9 @@ def _run_attack_through_pipeline(
     events: list[dict],
 ):
     """Push raw event dicts through the real parse→normalize→detect pipeline."""
+    now = datetime.now(timezone.utc)
     for ev in events:
-        payload = _structured_payload(ev["event_id"], agent.hostname, ev["when"], ev.get("data") or {})
+        payload = _structured_payload(ev["event_id"], agent.hostname, min(ev["when"], now), ev.get("data") or {})
         ingest_payload(db, payload, agent=agent, unit=unit)
 
 
