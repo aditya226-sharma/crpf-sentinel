@@ -30,56 +30,69 @@ settings = get_settings()
 
 
 def _purge_future_demo_events(db: Session) -> dict:
-    """Repair demo timestamps on existing databases.
+    """Repair demo timestamps on an existing database.
 
     Older seed versions could write events with timestamps in the future
     (``day.replace(hour=...)`` on "today"), which made them permanently sort
     as the "most recent" events. Future-dated bulk events not linked to any
     alert are removed (their log back-reference is nulled first to avoid the
     circular logs<->events FK); any remaining future-dated events (attack
-    bursts referenced by alerts) are clamped to now. Returns counts.
+    bursts referenced by alerts) are clamped to now. Best-effort: never
+    raises, rolls back on failure. Returns counts.
     """
     import logging
+
     from datetime import datetime, timezone
+
+    from sqlalchemy import select
 
     from app.models.alert import AlertEvent
     from app.models.event import NormalizedEvent
     from app.models.log import Log
 
+    logger = logging.getLogger("cyberrakshak.seed")
     now = datetime.now(timezone.utc)
-    referenced = {
-        rid
-        for (rid,) in db.query(AlertEvent.normalized_event_id)
-        .filter(AlertEvent.normalized_event_id.isnot(None))
-        .all()
-    }
-    orphan_ids = [
-        (eid,)
-        for (eid,) in db.query(NormalizedEvent.id)
-        .filter(NormalizedEvent.timestamp > now)
-        .filter(NormalizedEvent.id.notin_(referenced) if referenced else True)
-        .all()
-    ]
-    flat = [i for (i,) in orphan_ids]
-    if flat:
-        db.query(Log).filter(Log.normalized_event_id.in_(flat)).update(
-            {Log.normalized_event_id: None}, synchronize_session=False
+    try:
+        referenced = select(AlertEvent.normalized_event_id).where(
+            AlertEvent.normalized_event_id.isnot(None)
         )
-        db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(flat)).delete(
-            synchronize_session=False
+        orphan = select(NormalizedEvent.id).where(
+            NormalizedEvent.timestamp > now,
+            NormalizedEvent.id.notin_(referenced),
         )
-        db.query(Log).filter(
-            Log.normalized_event_id.is_(None), Log.received_at > now
-        ).delete(synchronize_session=False)
-    clamped = (
-        db.query(NormalizedEvent)
-        .filter(NormalizedEvent.timestamp > now)
-        .update({NormalizedEvent.timestamp: now}, synchronize_session=False)
-    )
-    db.commit()
-    result = {"events_removed": len(flat), "events_clamped": clamped}
-    logging.getLogger("cyberrakshak.seed").info("purged future-dated demo events: %s", result)
+        removed = db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(orphan)).count()
+        if removed:
+            db.query(Log).filter(Log.normalized_event_id.in_(orphan)).update(
+                {Log.normalized_event_id: None}, synchronize_session=False
+            )
+            db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(orphan)).delete(
+                synchronize_session=False
+            )
+            db.query(Log).filter(
+                Log.normalized_event_id.is_(None), Log.received_at > now
+            ).delete(synchronize_session=False)
+        clamped = (
+            db.query(NormalizedEvent)
+            .filter(NormalizedEvent.timestamp > now)
+            .update({NormalizedEvent.timestamp: now}, synchronize_session=False)
+        )
+        db.commit()
+        result = {"events_removed": removed, "events_clamped": clamped}
+    except Exception as exc:  # noqa: BLE001 - startup must never fail on repair
+        db.rollback()
+        result = {"events_removed": 0, "events_clamped": 0, "error": str(exc)}
+        logger.warning("purge of future-dated demo events failed: %s", exc)
+    logger.info("purged future-dated demo events: %s", result)
     return result
+
+
+def purge_future_demo_events() -> dict:
+    """Run the future-timestamp repair on its own session (post-startup)."""
+    db: Session = SessionLocal()
+    try:
+        return _purge_future_demo_events(db)
+    finally:
+        db.close()
 
 
 def seed_all(include_demo: bool | None = None) -> dict:

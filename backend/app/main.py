@@ -61,11 +61,19 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 @app.on_event("startup")
 async def on_startup() -> None:
+    try:
+        if settings.SEED_DEMO_DATA:
+            seed_all()
+        else:
+            init_database()
+    except Exception as exc:  # noqa: BLE001 - a seed failure must not block startup
+        import logging
+
+        logging.getLogger("cyberrakshak.startup").exception("startup seeding failed: %s", exc)
     if settings.SEED_DEMO_DATA:
-        seed_all()
-    else:
-        init_database()
-    if settings.SEED_DEMO_DATA:
+        from app.seed.seed_all import purge_future_demo_events
+
+        app.state.repair_task = asyncio.create_task(asyncio.to_thread(purge_future_demo_events))
         from app.simulation.live import start_live_demo
 
         app.state.live_demo_task = asyncio.create_task(start_live_demo())
@@ -74,5 +82,8 @@ async def on_startup() -> None:
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
     task = getattr(app.state, "live_demo_task", None)
+    if task is not None:
+        task.cancel()
+    task = getattr(app.state, "repair_task", None)
     if task is not None:
         task.cancel()
