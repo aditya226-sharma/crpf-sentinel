@@ -34,11 +34,12 @@ def _purge_future_demo_events(db: Session) -> dict:
 
     Older seed versions could write events with timestamps in the future
     (``day.replace(hour=...)`` on "today"), which made them permanently sort
-    as the "most recent" events. Bulk events not linked to alerts are removed
-    (with their raw logs); any remaining future-dated events (attack bursts
-    referenced by alerts) are clamped to now. Returns counts of removed and
-    clamped events.
+    as the "most recent" events. Future-dated bulk events not linked to any
+    alert are removed (their log back-reference is nulled first to avoid the
+    circular logs<->events FK); any remaining future-dated events (attack
+    bursts referenced by alerts) are clamped to now. Returns counts.
     """
+    import logging
     from datetime import datetime, timezone
 
     from app.models.alert import AlertEvent
@@ -46,10 +47,12 @@ def _purge_future_demo_events(db: Session) -> dict:
     from app.models.log import Log
 
     now = datetime.now(timezone.utc)
-    referenced = set(
+    referenced = {
         rid
-        for (rid,) in db.query(AlertEvent.normalized_event_id).filter(AlertEvent.normalized_event_id.isnot(None)).all()
-    )
+        for (rid,) in db.query(AlertEvent.normalized_event_id)
+        .filter(AlertEvent.normalized_event_id.isnot(None))
+        .all()
+    }
     orphan_ids = [
         (eid,)
         for (eid,) in db.query(NormalizedEvent.id)
@@ -57,19 +60,26 @@ def _purge_future_demo_events(db: Session) -> dict:
         .filter(NormalizedEvent.id.notin_(referenced) if referenced else True)
         .all()
     ]
-    removed = len(orphan_ids)
-    if orphan_ids:
-        flat = [i for (i,) in orphan_ids]
-        db.query(Log).filter(Log.normalized_event_id.in_(flat)).delete(synchronize_session=False)
-        db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(flat)).delete(synchronize_session=False)
-
+    flat = [i for (i,) in orphan_ids]
+    if flat:
+        db.query(Log).filter(Log.normalized_event_id.in_(flat)).update(
+            {Log.normalized_event_id: None}, synchronize_session=False
+        )
+        db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(flat)).delete(
+            synchronize_session=False
+        )
+        db.query(Log).filter(
+            Log.normalized_event_id.is_(None), Log.received_at > now
+        ).delete(synchronize_session=False)
     clamped = (
         db.query(NormalizedEvent)
         .filter(NormalizedEvent.timestamp > now)
         .update({NormalizedEvent.timestamp: now}, synchronize_session=False)
     )
     db.commit()
-    return {"events_removed": removed, "events_clamped": clamped}
+    result = {"events_removed": len(flat), "events_clamped": clamped}
+    logging.getLogger("cyberrakshak.seed").info("purged future-dated demo events: %s", result)
+    return result
 
 
 def seed_all(include_demo: bool | None = None) -> dict:

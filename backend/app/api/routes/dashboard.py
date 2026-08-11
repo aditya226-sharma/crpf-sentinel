@@ -175,10 +175,13 @@ def _pct_change(current: int, previous: int) -> float | None:
 
 
 def _live_events(db: Session, unit_ids: list[str] | None, limit: int = 12) -> list[dict]:
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
     q = db.query(NormalizedEvent)
     if unit_ids:
         q = q.filter(NormalizedEvent.unit_id.in_(unit_ids))
-    q = q.order_by(NormalizedEvent.timestamp.desc()).limit(limit)
+    q = q.filter(NormalizedEvent.timestamp <= now).order_by(NormalizedEvent.timestamp.desc()).limit(limit)
     events = q.all()
     units = {u.id: u for u in db.query(Unit).all()}
     rules = {r.rule_id: r.name for r in db.query(DetectionRule).all()}
