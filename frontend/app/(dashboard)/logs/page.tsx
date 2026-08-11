@@ -148,16 +148,16 @@ export default function LogsPage() {
                 {data.items.map((e) => (
                   <TableRow key={e.id}>
                     <TableCell className="whitespace-nowrap font-mono text-[11px] text-muted">
-                      <Link href={`/logs/${e.id}`} className="hover:text-accent">{formatDateTime(e.timestamp)}</Link>
+                      <Link href={`/logs/detail?id=${e.id}`} className="hover:text-accent">{formatDateTime(e.timestamp)}</Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/logs/${e.id}`} className="hover:text-accent">
+                      <Link href={`/logs/detail?id=${e.id}`} className="hover:text-accent">
                         <span className="text-xs text-foreground">{e.hostname ?? "—"}</span>
                         <span className="block text-[10px] text-muted">{e.unit_name}</span>
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/logs/${e.id}`} className="hover:text-accent">
+                      <Link href={`/logs/detail?id=${e.id}`} className="hover:text-accent">
                         <span className="font-mono text-[12px] text-accent">{e.event_id}</span>
                         <span className="block text-[10px] text-muted">{eventIdLabel(e.event_id)}</span>
                       </Link>

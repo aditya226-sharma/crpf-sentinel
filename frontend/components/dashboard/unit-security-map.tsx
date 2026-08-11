@@ -108,7 +108,7 @@ export function UnitSecurityMap({ units }: { units: UnitOverviewItem[] }) {
                 const { color } = nodeStyle(u);
                 const critical = color === "#EF4444";
                 return (
-                  <Link key={u.id} href={`/units/${u.id}`}>
+                  <Link key={u.id} href={`/units/detail?id=${u.id}`}>
                     <g
                       onMouseEnter={() => setHovered(u)}
                       onMouseLeave={() => setHovered(null)}
@@ -167,7 +167,7 @@ export function UnitSecurityMap({ units }: { units: UnitOverviewItem[] }) {
                     </span>
                   </div>
                 </div>
-                <Link href={`/units/${hovered.id}`} className="mt-4 block rounded-md border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-center text-[11px] font-medium text-accent hover:bg-accent/20">
+                <Link href={`/units/detail?id=${hovered.id}`} className="mt-4 block rounded-md border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-center text-[11px] font-medium text-accent hover:bg-accent/20">
                   Open Unit Details →
                 </Link>
               </div>

@@ -128,7 +128,7 @@ export default function RiskOverviewPage() {
                       return (
                         <TableRow key={u.id}>
                           <TableCell>
-                            <Link href={`/units/${u.id}`} className="hover:text-accent">
+                            <Link href={`/units/detail?id=${u.id}`} className="hover:text-accent">
                               <span className="font-mono text-[12px] text-accent">{u.unit_code}</span>
                               <span className="block text-[11px] text-muted">{u.name}</span>
                             </Link>
@@ -243,7 +243,7 @@ export default function RiskOverviewPage() {
                 ) : (
                   <div className="space-y-2">
                     {[...overviewQuery.data].filter((u) => u.risk >= 60).map((u) => (
-                      <Link key={u.id} href={`/units/${u.id}`} className="flex items-center justify-between rounded border border-critical/20 bg-critical/5 px-3 py-2 transition-colors hover:bg-critical/10">
+                      <Link key={u.id} href={`/units/detail?id=${u.id}`} className="flex items-center justify-between rounded border border-critical/20 bg-critical/5 px-3 py-2 transition-colors hover:bg-critical/10">
                         <div>
                           <p className="font-mono text-[12px] text-critical">{u.unit_code}</p>
                           <p className="text-[10px] text-muted">{u.name}</p>

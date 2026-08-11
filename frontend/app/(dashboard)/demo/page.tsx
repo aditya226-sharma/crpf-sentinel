@@ -216,7 +216,7 @@ export default function DemoPage() {
                       <p className="mb-1.5 text-[9px] uppercase tracking-wider text-muted">Raised Alerts</p>
                       <div className="flex flex-wrap gap-2">
                         {result.alert_ids.map((id) => (
-                          <Link key={id} href={`/alerts/${id}`}>
+                          <Link key={id} href={`/alerts/detail?id=${id}`}>
                             <Badge variant="high" className="px-2 py-1 font-mono text-[10px] transition-colors hover:bg-high/20">
                               {id}
                               <ArrowRight className="h-3 w-3" />

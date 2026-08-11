@@ -167,7 +167,7 @@ export default function IncidentDetailPage({ id }: { id: string }) {
                       {data.alerts.map((alert) => (
                         <TableRow key={alert.id}>
                           <TableCell>
-                            <Link href={`/alerts/${alert.id}`} className="group block min-w-0">
+                            <Link href={`/alerts/detail?id=${alert.id}`} className="group block min-w-0">
                               <span className="block truncate text-sm font-medium text-foreground group-hover:text-accent">{alert.title}</span>
                               <span className="block font-mono text-[11px] text-muted">{alert.alert_id} · {alert.hostname ?? "—"}</span>
                             </Link>

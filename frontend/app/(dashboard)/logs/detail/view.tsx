@@ -125,7 +125,7 @@ export default function LogDetailPage({ id }: { id: string }) {
                 {related?.map((e) => (
                   <Link
                     key={e.id}
-                    href={`/logs/${e.id}`}
+                    href={`/logs/detail?id=${e.id}`}
                     className="block rounded-md border border-border/60 bg-surface2/40 p-2.5 transition-colors hover:border-accent/40"
                   >
                     <div className="flex items-center justify-between gap-2">

@@ -138,7 +138,7 @@ export default function UnitDetailPage({ id }: { id: string }) {
                         {events?.items.map((e) => (
                           <TableRow key={e.id}>
                             <TableCell>
-                              <Link href={`/logs/${e.id}`} className="font-mono text-[11px] text-muted hover:text-accent">
+                              <Link href={`/logs/detail?id=${e.id}`} className="font-mono text-[11px] text-muted hover:text-accent">
                                 {timeAgo(e.timestamp)}
                               </Link>
                             </TableCell>
@@ -171,7 +171,7 @@ export default function UnitDetailPage({ id }: { id: string }) {
                         {alerts?.items.map((alert) => (
                           <TableRow key={alert.id}>
                             <TableCell>
-                              <Link href={`/alerts/${alert.alert_id}`} className="hover:text-accent">
+                              <Link href={`/alerts/detail?id=${alert.alert_id}`} className="hover:text-accent">
                                 <span className="block max-w-[280px] truncate text-[13px] text-foreground">{alert.title}</span>
                                 <span className="block font-mono text-[10px] text-muted">{alert.alert_id}</span>
                               </Link>

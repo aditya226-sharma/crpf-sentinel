@@ -28,7 +28,7 @@ export function ActiveThreats({ threats }: { threats: ActiveThreat[] }) {
               return (
                 <Link
                   key={threat.id}
-                  href={`/alerts/${threat.alert_id}`}
+                  href={`/alerts/detail?id=${threat.alert_id}`}
                   className="block py-2.5 transition-colors hover:bg-surface2/40"
                 >
                   <div className="flex items-start justify-between gap-3">

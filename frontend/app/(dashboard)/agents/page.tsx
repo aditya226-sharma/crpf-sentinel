@@ -102,7 +102,7 @@ export default function AgentsPage() {
               {data.map((agent) => (
                 <TableRow key={agent.id} className={cn(!agent.is_enabled && "opacity-50")}>
                   <TableCell>
-                    <Link href={`/agents/${agent.id}`} className="group block min-w-0">
+                    <Link href={`/agents/detail?id=${agent.id}`} className="group block min-w-0">
                       <span className="block text-xs font-medium text-foreground group-hover:text-accent">{agent.hostname}</span>
                       <span className="block font-mono text-[10px] text-muted">{agent.ip_address ?? "—"}</span>
                     </Link>

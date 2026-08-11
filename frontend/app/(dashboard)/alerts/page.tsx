@@ -110,7 +110,7 @@ export default function AlertsPage() {
                   return (
                     <TableRow key={alert.id}>
                       <TableCell className="max-w-[320px]">
-                        <Link href={`/alerts/${alert.alert_id}`} className="hover:text-accent">
+                        <Link href={`/alerts/detail?id=${alert.alert_id}`} className="hover:text-accent">
                           <span className="block truncate text-[13px] font-medium text-foreground">{alert.title}</span>
                           <span className="block font-mono text-[10px] text-muted">{alert.rule_id ?? "correlation"} · {alert.alert_id}</span>
                         </Link>

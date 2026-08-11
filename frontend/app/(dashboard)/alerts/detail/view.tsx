@@ -177,7 +177,7 @@ export default function AlertDetailPage({ id }: { id: string }) {
                   {data.events.map((e) => (
                     <TableRow key={e.id}>
                       <TableCell>
-                        <Link href={`/logs/${e.id}`} className="font-mono text-[11px] text-muted hover:text-accent">
+                        <Link href={`/logs/detail?id=${e.id}`} className="font-mono text-[11px] text-muted hover:text-accent">
                           {formatDateTime(e.timestamp)}
                         </Link>
                       </TableCell>

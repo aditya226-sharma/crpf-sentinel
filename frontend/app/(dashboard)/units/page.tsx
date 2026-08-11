@@ -27,7 +27,7 @@ export default function UnitsPage() {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {data?.map((unit) => (
-          <Link key={unit.id} href={`/units/${unit.id}`}>
+          <Link key={unit.id} href={`/units/detail?id=${unit.id}`}>
             <Card className="transition-colors hover:border-accent/40">
               <CardHeader className="flex flex-row items-start justify-between pb-1">
                 <div className="flex items-center gap-3">

@@ -71,19 +71,19 @@ export default function SearchPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <ResultCard icon={FileSearch} title="Events" count={data?.events.length ?? 0} color="text-accent">
           {(data?.events ?? []).map((e) => (
-            <ResultRow key={e.id} href={`/logs/${e.id}`} title={`${e.event_id} · ${e.hostname ?? "—"}`} sub={`${e.username ?? "—"} · ${e.source_ip ?? "—"}`} right={<SeverityBadge severity={e.severity} />} meta={`${e.category ?? ""}`} />
+            <ResultRow key={e.id} href={`/logs/detail?id=${e.id}`} title={`${e.event_id} · ${e.hostname ?? "—"}`} sub={`${e.username ?? "—"} · ${e.source_ip ?? "—"}`} right={<SeverityBadge severity={e.severity} />} meta={`${e.category ?? ""}`} />
           ))}
         </ResultCard>
 
         <ResultCard icon={Bell} title="Alerts" count={data?.alerts.length ?? 0} color="text-orange-400">
           {(data?.alerts ?? []).map((a) => (
-            <ResultRow key={a.id} href={`/alerts/${a.id}`} title={a.title} sub={a.alert_id} right={<SeverityBadge severity={a.severity} />} meta={<StatusBadge status={a.status} />} />
+            <ResultRow key={a.id} href={`/alerts/detail?id=${a.id}`} title={a.title} sub={a.alert_id} right={<SeverityBadge severity={a.severity} />} meta={<StatusBadge status={a.status} />} />
           ))}
         </ResultCard>
 
         <ResultCard icon={Siren} title="Incidents" count={data?.incidents.length ?? 0} color="text-red-400">
           {(data?.incidents ?? []).map((i) => (
-            <ResultRow key={i.id} href={`/incidents/${i.id}`} title={i.title} sub={i.incident_id} right={<SeverityBadge severity={i.severity} />} meta={<StatusBadge status={i.status} />} />
+            <ResultRow key={i.id} href={`/incidents/detail?id=${i.id}`} title={i.title} sub={i.incident_id} right={<SeverityBadge severity={i.severity} />} meta={<StatusBadge status={i.status} />} />
           ))}
         </ResultCard>
 
@@ -102,12 +102,12 @@ export default function SearchPage() {
         <div className="grid gap-4">
           <ResultCard icon={Network} title="Agents" count={data?.agents.length ?? 0} color="text-blue-400">
             {(data?.agents ?? []).map((a) => (
-              <ResultRow key={a.id} href={`/agents/${a.id}`} title={a.hostname} sub={a.agent_id} right={<StatusBadge status={a.status} />} meta={a.ip_address} />
+              <ResultRow key={a.id} href={`/agents/detail?id=${a.id}`} title={a.hostname} sub={a.agent_id} right={<StatusBadge status={a.status} />} meta={a.ip_address} />
             ))}
           </ResultCard>
           <ResultCard icon={Building2} title="Units" count={data?.units.length ?? 0} color="text-violet-400">
             {(data?.units ?? []).map((u) => (
-              <ResultRow key={u.id} href={`/units/${u.id}`} title={u.name} sub={u.unit_code} right={<StatusBadge status={u.status} />} />
+              <ResultRow key={u.id} href={`/units/detail?id=${u.id}`} title={u.name} sub={u.unit_code} right={<StatusBadge status={u.status} />} />
             ))}
           </ResultCard>
         </div>

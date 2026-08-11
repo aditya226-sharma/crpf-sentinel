@@ -90,7 +90,7 @@ export function NotificationDrawer() {
               </div>
               <p className="mt-1.5 text-[12px] leading-snug text-foreground">{n.title}</p>
               {n.alert_id && (
-                <Link href={`/alerts/${n.alert_id}`} className="mt-1 block font-mono text-[10px] text-accent hover:underline">
+                <Link href={`/alerts/detail?id=${n.alert_id}`} className="mt-1 block font-mono text-[10px] text-accent hover:underline">
                   Open alert →
                 </Link>
               )}

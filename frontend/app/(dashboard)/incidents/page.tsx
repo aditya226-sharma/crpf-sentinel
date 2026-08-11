@@ -110,7 +110,7 @@ export default function IncidentsPage() {
                 {data.items.map((inc) => (
                   <TableRow key={inc.id}>
                     <TableCell>
-                      <Link href={`/incidents/${inc.id}`} className="group block min-w-0">
+                      <Link href={`/incidents/detail?id=${inc.id}`} className="group block min-w-0">
                         <span className="block truncate text-sm font-medium text-foreground group-hover:text-accent">
                           {inc.title}
                         </span>
