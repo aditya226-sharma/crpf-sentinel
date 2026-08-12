@@ -70,6 +70,26 @@ def run_ioc_check(db: Session, event: dict, event_row_id: int | None = None) -> 
     return triggered
 
 
+def _find_open_ioc_alert(
+    db: Session, ioc: IocEntry, event: dict
+) -> Alert | None:
+    """Reuse an existing open alert for the same indicator + unit.
+
+    Mirrors the rule engine's open-alert dedup so repeated matches of the same
+    indicator inside a unit aggregate into one alert (bumping event_count)
+    instead of flooding the alert list with one new alert per matching event.
+    """
+    unit_id = event.get("unit_id")
+    query = db.query(Alert).filter(
+        Alert.rule_id.is_(None),
+        Alert.title == f"IOC Match: {ioc.value}",
+        Alert.status.in_(["open", "investigating"]),
+    )
+    if unit_id:
+        query = query.filter(Alert.unit_id == unit_id)
+    return query.order_by(Alert.last_seen.desc()).first()
+
+
 def _raise_ioc_alert(db: Session, ioc: IocEntry, event: dict, event_row_id: int | None) -> Alert | None:
     now = datetime.now(timezone.utc)
     severity = ioc.severity or "medium"
@@ -87,6 +107,28 @@ def _raise_ioc_alert(db: Session, ioc: IocEntry, event: dict, event_row_id: int 
         f"{ioc.ioc_type.upper()} indicator {ioc.value}."
         + (f" ({ioc.description})" if ioc.description else "")
     )
+
+    open_alert = _find_open_ioc_alert(db, ioc, event)
+    if open_alert is not None:
+        open_alert.event_count += 1
+        open_alert.last_seen = now
+        open_alert.risk_score = max(open_alert.risk_score or 0, risk_score)
+        open_alert.risk_factors = risk_factors
+        open_alert.source_ip = event.get("source_ip") or open_alert.source_ip
+        db.add(open_alert)
+        ioc.times_matched += 1
+        ioc.last_matched_at = now
+        db.add(ioc)
+        if event_row_id:
+            db.add(
+                AlertEvent(
+                    alert_id=open_alert.id,
+                    normalized_event_id=event_row_id,
+                    timestamp=now,
+                )
+            )
+        db.commit()
+        return None
 
     alert = Alert(
         id=uuid.uuid4().hex[:16],

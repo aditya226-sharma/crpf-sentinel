@@ -260,17 +260,28 @@ def _unit_overview(db: Session, unit_ids: list[str] | None) -> list[dict]:
 
 
 def _unit_risk(db: Session, unit_id: str) -> int:
-    score = 0
+    """Unit security score from open/investigating alerts.
+
+    Calibrated so a realistic demo alert load maps to a spread across the
+    map color bands (green < 35, warning 35-59, critical >= 60) instead of
+    saturating at 100 after a handful of high-severity alerts. Weights are
+    intentionally smaller than alert-level risk scores: a few medium alerts
+    should read as "normal", while repeated criticals push toward red.
+    """
     counts = dict(
         db.query(Alert.severity, func.count(Alert.id))
         .filter(Alert.unit_id == unit_id, Alert.status.in_(["open", "investigating"]))
         .group_by(Alert.severity)
         .all()
     )
-    score += counts.get("critical", 0) * 30
-    score += counts.get("high", 0) * 15
-    score += counts.get("medium", 0) * 8
-    score += counts.get("low", 0) * 4
+    if not counts:
+        return 0
+    score = (
+        counts.get("critical", 0) * 15
+        + counts.get("high", 0) * 8
+        + counts.get("medium", 0) * 4
+        + counts.get("low", 0) * 2
+    )
     return min(100, score)
 
 
