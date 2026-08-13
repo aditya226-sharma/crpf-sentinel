@@ -1,6 +1,8 @@
-"""Seed entrypoint: tables + roles + admin + rules + units (+ optional demo data).
+"""Seed entrypoint: tables + roles + admin + rules + units.
 
-Run with:  python -m app.seed.seed_all
+This is a live production platform: startup only bootstraps the schema, the
+admin account, detection rules and the CRPF unit structure. Synthetic demo
+data seeding has been removed entirely.
 """
 
 import sys
@@ -20,16 +22,8 @@ from app.seed.demo_rules import seed_rules
 settings = get_settings()
 
 
-def seed_all(include_demo: bool | None = None) -> dict:
-    """Bootstrap the platform.
-
-    Live mode (default) seeds roles, the admin account, detection rules and
-    the CRPF unit structure. Demo mode additionally seeds synthetic agents,
-    users, events, incidents and IOC entries for evaluation purposes.
-    """
-    if include_demo is None:
-        include_demo = settings.SEED_DEMO_DATA
-
+def seed_all() -> dict:
+    """Bootstrap the live platform: roles, admin, detection rules, units."""
     init_database()
     db: Session = SessionLocal()
     try:
@@ -37,27 +31,8 @@ def seed_all(include_demo: bool | None = None) -> dict:
         admin = db.query(User).filter(User.username == settings.SEED_ADMIN_USERNAME).first()
         rules_seeded = seed_rules(db, created_by=admin)
         units = seed_units(db)
-
-        result: dict = {"rules": rules_seeded, "units": len(units)}
-
-        if include_demo:
-            from app.models.event import NormalizedEvent
-            from app.seed.demo_data import seed_agents, seed_demo_data, seed_demo_users
-            from app.seed.soc import seed_demo_incidents, seed_iocs
-
-            agents = seed_agents(db, units)
-            seed_demo_users(db, units, roles)
-            already_seeded = db.query(NormalizedEvent.id).count() >= 5000
-            if already_seeded:
-                demo = {"events_created": 0, "attack_bursts": 0}
-            else:
-                demo = seed_demo_data(db, units, agents)
-            result.update(demo)
-            result["iocs_seeded"] = seed_iocs(db)
-            result["incidents_seeded"] = seed_demo_incidents(db)
-
         db.commit()
-        return result
+        return {"rules": rules_seeded, "units": len(units)}
     finally:
         db.close()
 
