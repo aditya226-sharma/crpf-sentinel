@@ -125,6 +125,5 @@ def build_report(
         "title": title,
         "generated_at": _utcnow().isoformat(),
         "rows": len(rows),
-        "demo_notice": "DEMO / SYNTHETIC DATA",
     }
     return payload, content_type, meta

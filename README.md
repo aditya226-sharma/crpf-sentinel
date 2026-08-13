@@ -6,8 +6,9 @@ Reserve Police Force (CRPF) units — submitted for **Smart India Hackathon
 them, runs correlation + MITRE ATT&CK–mapped detection rules, and surfaces
 alerts in a live React dashboard with role-based access control.
 
-> **Demo / synthetic data only.** All bundled log data and scenarios are
-> generated locally. No real CRPF systems are touched.
+> **Live deployment.** The platform is deployed for live monitoring; data comes
+> only from registered agents shipping real Windows Event Logs. No synthetic
+> data is generated at runtime.
 
 ---
 
@@ -65,7 +66,7 @@ Requires Python 3.10+ and Node 18+.
 cd backend
 cp .env.example .env
 pip install -r requirements.txt
-python -m app.seed.seed_all        # tables + roles + admin + demo data + rules
+python -m app.seed.seed_all        # tables + roles + admin + rules + units
 uvicorn app.main:app --reload --port 8000
 
 # 2) Frontend
@@ -85,33 +86,34 @@ Or with the Makefile:
 ```bash
 make backend      # uvicorn on :8000
 make frontend     # Next.js on :3000
-make seed         # seed demo data + rules
+make seed         # seed roles + admin + rules + units
 make agent        # simulated agent (needs AGENT_API_TOKEN=...)
 ```
 
-### Demo credentials (seeded)
+### Bootstrapped credentials
 
-| Role            | Username   | Password      |
-|-----------------|------------|---------------|
-| Super admin     | `admin`    | `Sentinel@123`|
-| Security expert | `analyst`  | `Analyst@123` |
+| Role         | Username | Password        |
+|--------------|----------|-----------------|
+| Super admin  | `admin`  | `Sentinel@123`  |
 
-### Demo runbook
+> In production, set `SEED_ADMIN_PASSWORD` to a strong value — do not keep the
+> default.
+
+### Live runbook
 
 1. `make seed`, then open `http://localhost:3000/dashboard`.
-2. Register a demo agent (**Agents** → **Register**) and run
+2. Register a real agent (**Agents** → **Register**) — the UI returns an API
+   token — and run the Windows collector on a monitored endpoint:
    `make agent AGENT_API_TOKEN=<token>`.
-3. Watch the **Live Events** feed populate as the simulated agent ships events.
-4. Open **Demo Lab** (`/demo`) and run an attack scenario (e.g.
-   *Brute Force*, *Privilege Escalation*, *Credential Dumping*, *Lateral
-   Movement*, *Ransomware*) — synthetic events stream in and alerts fire.
-5. Triage alerts in **Alerts**, correlate with **Logs**, and export **Reports**.
-6. Open **Incidents** (`/incidents`) — seeded demo incidents group related
-   alerts with notes and event timelines; drive the workflow to *closed*.
-7. Open **IOC Library** (`/ioc-library`) — indicators are matched against
-   inbound events during detection (try `203.0.113.14` from the brute-force
-   scenario); **MITRE ATT&CK** (`/mitre`) shows technique coverage.
-8. Use **Search** (`/search`) for a global lookup across events, alerts,
+3. Watch the **Live Events** feed populate as the agent ships real Windows
+   Event Logs (Security/System/Application channels).
+4. Triage alerts in **Alerts**, correlate with **Logs**, and export **Reports**.
+5. Open **Incidents** (`/incidents`) to group related alerts and drive the
+   triage → investigate → escalate → resolve → close workflow.
+6. Open **IOC Library** (`/ioc-library`) to add indicators matched against
+   inbound events during detection; **MITRE ATT&CK** (`/mitre`) shows
+   technique coverage.
+7. Use **Search** (`/search`) for a global lookup across events, alerts,
    incidents, rules, IOCs, agents and units.
 
 ---
@@ -124,7 +126,7 @@ Backend (`.env`, see `backend/.env.example`):
 |---------------------------|--------------------------|--------------------------------|
 | `DATABASE_URL`            | Postgres (docker)        | use `sqlite:///./sentinel.db`  |
 | `JWT_SECRET`              | change-me…               | long random secret             |
-| `SEED_DEMO_DATA`          | `true`                   | seed demo units/agents/logs    |
+| `SEED_DEMO_DATA`          | `false`                  | seed synthetic units/agents/logs |
 | `SEED_ADMIN_USERNAME`     | `admin`                  | seeded super-admin             |
 | `SEED_ADMIN_PASSWORD`     | `Sentinel@123`           | seeded password                |
 
@@ -150,7 +152,7 @@ Permissions are enforced server-side in `backend/app/core/deps.py`.
 | Role             | Can do                                                     |
 |------------------|------------------------------------------------------------|
 | `super_admin`    | everything incl. users, units, settings, audit, IOCs       |
-| `security_expert`| logs, alerts (manage), rules (manage), incidents, IOC view, agents view, reports, demo |
+| `security_expert`| logs, alerts (manage), rules (manage), incidents, IOC view, agents view, reports |
 | `unit_admin`     | dashboard, logs, alerts, agents/units view, reports (unit-scoped) |
 
 ---
@@ -181,11 +183,11 @@ backend/          # FastAPI SIEM engine
   app/detection/  #   rule engine, correlation, IOC matching, MITRE map
   app/api/routes/ #   auth, logs, alerts, incidents, ioc, mitre,
                   #   analytics, assets, search, agents, units, users,
-                  #   rules, reports, audit, demo, stats, stream
-  app/seed/       #   roles, units, agents, demo data, rules, SOC seed
+                  #   rules, reports, audit, stats, stream
+  app/seed/       #   roles, units, rules, SOC seed (+ demo mode)
 frontend/         # Next.js 15 dashboard
   app/(dashboard) #   dashboard, live-events, logs, alerts, incidents,
                   #   rules, threat-intel, ioc-library, mitre, correlations,
                   #   search, threat-analytics, assets, units, agents,
-                  #   users, reports, audit-logs, settings, demo
+                  #   users, reports, audit-logs, settings
 ```

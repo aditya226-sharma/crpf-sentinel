@@ -294,23 +294,6 @@ export interface Stats {
   total_rules: number;
   events_per_second: number;
   storage_estimate_mb: number;
-  demo_notice: string;
-}
-
-export interface ScenarioInfo {
-  id: string;
-  name: string;
-  explanation: string;
-}
-
-export interface ScenarioResult {
-  scenario: string;
-  name: string;
-  events_ingested: number;
-  alerts_triggered: number;
-  alert_ids: string[];
-  explanation: string;
-  demo_notice?: string;
 }
 
 export interface Role {

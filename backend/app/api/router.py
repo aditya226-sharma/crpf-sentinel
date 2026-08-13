@@ -10,7 +10,6 @@ from app.api.routes import (
     audit,
     auth,
     dashboard,
-    demo,
     health,
     incidents,
     ioc,
@@ -45,5 +44,4 @@ api_router.include_router(units.router)
 api_router.include_router(users.router)
 api_router.include_router(audit.router)
 api_router.include_router(reports.router)
-api_router.include_router(demo.router)
 api_router.include_router(stream.router)

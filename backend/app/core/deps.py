@@ -32,7 +32,6 @@ PERMISSIONS = {
     "threat_intel.view",
     "threat_intel.manage",
     "correlations.view",
-    "demo.run",
 }
 
 ROLE_PERMISSIONS = {
@@ -48,7 +47,6 @@ ROLE_PERMISSIONS = {
         "units.view",
         "audit.view",
         "reports.view",
-        "demo.run",
         "threat_intel.view",
         "correlations.view",
     },

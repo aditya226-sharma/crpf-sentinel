@@ -14,7 +14,6 @@ class ReportMeta(BaseModel):
     title: str
     generated_at: str
     rows: int
-    demo_notice: bool = True
 
 
 class StatsOut(BaseModel):

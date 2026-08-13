@@ -1,14 +1,11 @@
 """CyberRakshak — FastAPI application entrypoint."""
 
-import asyncio
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
-from app.database.init_db import init_database
 from app.seed.seed_all import seed_all
 
 settings = get_settings()
@@ -20,7 +17,7 @@ app = FastAPI(
     description=(
         "Centralized IT System Log Analysis & Threat Detection Platform. "
         "Windows Event Log ingestion, normalization, signature detection, "
-        "alert management and SOC monitoring. All data is DEMO / SYNTHETIC."
+        "alert management and SOC monitoring."
     ),
     version=settings.APP_VERSION,
     docs_url="/docs" if _expose_docs else None,
@@ -62,22 +59,8 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 @app.on_event("startup")
 async def on_startup() -> None:
     try:
-        if settings.SEED_DEMO_DATA:
-            seed_all()
-        else:
-            init_database()
+        seed_all()
     except Exception as exc:  # noqa: BLE001 - a seed failure must not block startup
         import logging
 
         logging.getLogger("cyberrakshak.startup").exception("startup seeding failed: %s", exc)
-    if settings.SEED_DEMO_DATA:
-        from app.simulation.live import start_live_demo
-
-        app.state.live_demo_task = asyncio.create_task(start_live_demo())
-
-
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    task = getattr(app.state, "live_demo_task", None)
-    if task is not None:
-        task.cancel()

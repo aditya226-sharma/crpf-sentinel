@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_GENERAL_PER_MINUTE: int = 120
 
     # Seeding
-    SEED_DEMO_DATA: bool = True
+    SEED_DEMO_DATA: bool = False
     SEED_ADMIN_USERNAME: str = "admin"
     SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
     SEED_ADMIN_PASSWORD: str = "Sentinel@123"

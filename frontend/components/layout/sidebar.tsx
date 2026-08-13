@@ -24,7 +24,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Gauge,
-  FlaskConical,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,7 +52,6 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permissions: ["dashboard.view"] },
       { href: "/live-events", label: "Live Events", icon: Radio, permissions: ["logs.view"] },
-      { href: "/demo", label: "Demo Lab", icon: FlaskConical, permissions: ["demo.run"] },
     ],
   },
   {
@@ -104,7 +102,6 @@ const navGroups: { title: string; items: NavItem[] }[] = [
 const SECTION_LABELS: Record<string, string> = {
   "/dashboard": "COMMAND CENTER",
   "/live-events": "COMMAND CENTER",
-  "/demo": "COMMAND CENTER",
   "/logs": "MONITORING",
   "/alerts": "MONITORING",
   "/incidents": "MONITORING",

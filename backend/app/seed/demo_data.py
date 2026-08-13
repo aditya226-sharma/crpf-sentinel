@@ -20,8 +20,6 @@ from app.models.user import User
 from app.normalization.engine import EVENT_CLASSIFICATION
 from app.services.ingest import ingest_payload
 
-DEMO_NOTICE = "DEMO / SYNTHETIC DATA - NO REAL CRPF SYSTEMS"
-
 UNITS = [
     ("UNIT-01", "Delhi Unit", "North", "New Delhi", "Delhi", 28.6139, 77.2090, 61),
     ("UNIT-02", "Gujarat Unit", "West", "Ahmedabad", "Gujarat", 23.0225, 72.5714, 42),

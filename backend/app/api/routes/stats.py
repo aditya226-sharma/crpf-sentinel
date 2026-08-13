@@ -58,5 +58,4 @@ def get_stats(
         "total_rules": rules,
         "events_per_second": agents_online * 30,
         "storage_estimate_mb": round(total_events * 0.6 / 1024, 2),
-        "demo_notice": "DEMO / SYNTHETIC DATA",
     }

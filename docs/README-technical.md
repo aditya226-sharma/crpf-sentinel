@@ -2,11 +2,11 @@
 
 A deep-dive technical reference for **CyberRakshak**, a Security Information
 and Event Management (SIEM) platform for Central Reserve Police Force (CRPF)
-units (Smart India Hackathon demo). This document explains how the web
-application is built and how it works end to end.
+units. This document explains how the web application is built and how it works
+end to end.
 
-> **Demo / synthetic data only.** All bundled log data and scenarios are
-> generated locally. No real CRPF systems are touched.
+> **Live deployment.** Data comes only from registered agents shipping real
+> Windows Event Logs; no synthetic data is generated at runtime.
 
 ---
 
@@ -94,9 +94,11 @@ One event from an endpoint agent to a live dashboard alert:
 - Security headers middleware (`X-Frame-Options: DENY`, `nosniff`, etc.; HSTS
   only in production).
 - Central error envelope handler: `{"success": false, "error": {"code", "message"}}`.
-- On startup it only creates tables and seeds **roles + admin user**. Demo data
-  (units, agents, rules, ~10k events, IOCs, incidents) is seeded separately via
-  `python -m app.seed.seed_all`, `make seed`, or `POST /api/demo/seed`.
+- On startup it creates tables and seeds **roles + admin + rules + units**
+  (`seed_all`). No events, alerts or incidents are fabricated; data accumulates
+  only from registered agents ingesting real Windows Event Logs. With
+  `SEED_DEMO_DATA=true` the startup additionally seeds synthetic units, agents,
+  users, ~10k events, IOCs and incidents for evaluation.
 
 ### 3.2 Configuration (`app/core/config.py`)
 
@@ -158,7 +160,6 @@ SQLAlchemy ORM over SQLite (dev) or PostgreSQL (deploy). Tables:
 | `/units`, `/users` | management (guards protect last super_admin) |
 | `/audit-logs`, `/notifications` | audit trail + in-app notifications |
 | `/reports` | daily/weekly/unit/alerts/rules as CSV or JSON |
-| `/demo` | seed + run synthetic attack scenarios |
 | `/stream/live` | **SSE live feed** (events + alerts) |
 
 ### 3.6 Detection engine
@@ -198,7 +199,7 @@ root layout and the `/` → `/dashboard` redirect.
   `/dashboard`, `/live-events`, `/logs`, `/alerts`, `/incidents`, `/search`,
   `/units`, `/agents`, `/assets`, `/rules`, `/threat-intel`,
   `/ioc-library`, `/mitre`, `/threat-analytics`, `/risk-overview`,
-  `/correlations`, `/reports`, `/users`, `/audit-logs`, `/settings`, `/demo`.
+  `/correlations`, `/reports`, `/users`, `/audit-logs`, `/settings`.
 
 ### 4.3 API client (`lib/api.ts`)
 
@@ -253,16 +254,18 @@ It auto-reconnects with exponential backoff and drives the connection badge
 
 ---
 
-## 7. Demo credentials & runbook
+## 7. Bootstrapped credentials
 
 | Role | Username | Password |
 |------|----------|----------|
 | Super admin | `admin` | `Sentinel@123` |
-| Security expert | `analyst` | `Analyst@123` |
-| Unit admin (Delhi) | `unitadmin` | `UnitAdmin@123` |
 
-Runbook: seed demo data → open `/dashboard` → register/run a simulated agent →
-watch Live Events → run an attack scenario in **Demo Lab** (`/demo`) → triage
-alerts → group into incidents → export reports.
+> In production, override `SEED_ADMIN_PASSWORD` — do not keep the default.
 
-> All data is **DEMO / SYNTHETIC**. No real CRPF systems are touched.
+Runbook: open `/dashboard` → register real agents (**Agents** → **Register**,
+each returns a one-time API token) → install/run the Windows collector on
+endpoints (`agent/`) → watch Live Events as real Windows Event Logs stream in →
+triage alerts → group into incidents → export reports.
+
+> Live platform — data is produced only by registered agents shipping real
+> Windows Event Logs.

@@ -36,7 +36,6 @@ const connectionVariant = {
 const PAGE_TITLES: Record<string, { section: string; page: string }> = {
   "/dashboard": { section: "COMMAND CENTER", page: "Command Center" },
   "/live-events": { section: "COMMAND CENTER", page: "Live Events" },
-  "/demo": { section: "COMMAND CENTER", page: "Demo Center" },
   "/logs": { section: "MONITORING", page: "Log Explorer" },
   "/alerts": { section: "MONITORING", page: "Security Alerts" },
   "/incidents": { section: "MONITORING", page: "Incidents" },

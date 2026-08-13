@@ -34,11 +34,11 @@ services:
       - key: TRUST_PROXY
         value: "true"
       - key: SEED_DEMO_DATA
-        value: "true"
+        value: "false"
       - key: SEED_ADMIN_USERNAME
         value: admin
       - key: SEED_ADMIN_EMAIL
-        value: admin@cyberrakshak.demo
+        value: admin@cyberrakshak.in
       - key: SEED_ADMIN_PASSWORD
         value: Sentinel@123
       - key: BACKEND_CORS_ORIGINS

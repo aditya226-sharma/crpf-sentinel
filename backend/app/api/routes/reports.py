@@ -33,7 +33,6 @@ def download_report(
     headers = {
         "X-Report-Type": meta["report_type"],
         "X-Report-Rows": str(meta["rows"]),
-        "X-Demo-Notice": meta["demo_notice"],
         "Content-Disposition": f'attachment; filename="{report_type}_report.{format}"',
     }
     return PlainTextResponse(content=payload, media_type=content_type, headers=headers)

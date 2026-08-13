@@ -22,8 +22,6 @@ import type {
   Role,
   Rule,
   RuleTestResult,
-  ScenarioInfo,
-  ScenarioResult,
   SearchResults,
   Stats,
   ThreatActivity,
@@ -170,14 +168,6 @@ export const reportService = {
     if (unitId) params.set("unit_id", unitId);
     return api.raw(`/api/reports/${reportType}?${params.toString()}`);
   },
-};
-
-// Demo
-export const demoService = {
-  status: () => api.get<{ active: boolean; notice: string; units: number; agents: number; events: number; alerts: number }>("/api/demo/status"),
-  scenarios: () => api.get<ScenarioInfo[]>("/api/demo/scenarios"),
-  run: (scenario: string) => api.post<ScenarioResult>(`/api/demo/scenarios/${scenario}`),
-  seed: () => api.post<{ units: number; agents: number; events: number; rules: number; alerts: number; demo_notice: string }>("/api/demo/seed"),
 };
 
 // Stats
