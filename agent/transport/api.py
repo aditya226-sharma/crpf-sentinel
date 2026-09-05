@@ -24,6 +24,10 @@ class Transport:
         self.session.headers.update(
             {"x-agent-token": settings.api_token, "Content-Type": "application/json"}
         )
+        self._hb_session = requests.Session()
+        self._hb_session.headers.update(
+            {"x-agent-token": settings.api_token, "Content-Type": "application/json"}
+        )
         self.base = settings.server_url
         self._retry_backoff = 1.0
 
@@ -87,7 +91,7 @@ class Transport:
         """Send a lightweight heartbeat (bearer-auth'd); {} on failure."""
         try:
             url = f"{self.base}/api/agents/heartbeat"
-            resp = self.session.post(
+            resp = self._hb_session.post(
                 url,
                 json=metrics,
                 timeout=(self.settings.connect_timeout, self.settings.request_timeout),
@@ -103,3 +107,4 @@ class Transport:
 
     def close(self) -> None:
         self.session.close()
+        self._hb_session.close()

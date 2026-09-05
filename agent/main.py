@@ -39,6 +39,8 @@ class CyberRakshakAgent:
         self.spool = Spool(settings.spool_dir, max_mb=settings.spool_max_mb)
         self.transport = Transport(settings, stop_event=self._stop)
         self._stats = {"collected": 0, "sent": 0, "failed": 0}
+        self._stats_lock = threading.Lock()
+        self._hb_thread: threading.Thread | None = None
         self._os_info = os_info()
 
     # -- lifecycle ----------------------------------------------------------
@@ -57,15 +59,13 @@ class CyberRakshakAgent:
             log.warning("CYBERRAKSHAK_API_TOKEN is empty — server will reject requests")
 
         last_heartbeat = 0.0
+        self._hb_thread = threading.Thread(target=self._heartbeat_loop, name="heartbeat", daemon=True)
+        self._hb_thread.start()
         while not self._stop.is_set():
             try:
                 self.collect_and_flush()
                 if self._stop.is_set():
                     break
-                now = time.monotonic()
-                if now - last_heartbeat >= self.settings.metrics_interval_seconds:
-                    self.send_heartbeat()
-                    last_heartbeat = now
             except Exception as exc:  # noqa: BLE001 — keep the loop alive
                 log.error("loop error: %s", exc)
             self._stop.wait(self.settings.poll_interval_seconds)
@@ -87,7 +87,8 @@ class CyberRakshakAgent:
         if raw:
             normalized = [normalize(r) for r in raw]
             kept = self.spool.append(normalized)
-            self._stats["collected"] += kept
+            with self._stats_lock:
+                self._stats["collected"] += kept
             log.debug("collected %s events (%s spooled)", len(raw), kept)
 
         pending = self.spool.drain()
@@ -119,21 +120,31 @@ class CyberRakshakAgent:
             log.warning("could not deliver %s events: %s", len(pending), exc)
             return False
 
+    def _heartbeat_loop(self) -> None:
+        """Send heartbeats on a fixed cadence regardless of flush backoff."""
+        while not self._stop.wait(self.settings.metrics_interval_seconds):
+            try:
+                self.send_heartbeat()
+            except Exception as exc:  # noqa: BLE001 — keep the loop alive
+                log.error("heartbeat loop error: %s", exc)
+
     def send_heartbeat(self) -> None:
         spool_mb = self.spool.size_mb
+        with self._stats_lock:
+            events_per_sec = int(self._stats["collected"] / max(1, self.settings.metrics_interval_seconds))
+            self._stats["collected"] = 0
         metrics = {
             "hostname": self.settings.effective_hostname,
             "ip_address": local_ip(),
             "os_version": self._os_info["os_version"],
             "agent_version": "1.0.0",
-            "events_per_sec": int(self._stats["collected"] / max(1, self.settings.metrics_interval_seconds)),
+            "events_per_sec": events_per_sec,
             "buffer_size": int(spool_mb * 1024 * 1024),
             "sync_status": "healthy" if spool_mb < 1 else f"buffering {spool_mb:.1f} MB",
             **system_metrics(),
         }
         resp = self.transport.heartbeat(metrics)
         log.debug("heartbeat -> %s", resp or "no response")
-        self._stats["collected"] = 0
 
 
 def main() -> None:
