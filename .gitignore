@@ -34,3 +34,9 @@ agent/config/agent.live.yaml
 *.tsbuildinfo
 frontend/out/
 out/
+
+# Live-sim agent config (contains agent API token)
+agent/config/agent.live-sim.yaml
+
+# Agent runtime logs
+agent/logs/
