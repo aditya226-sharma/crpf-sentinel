@@ -1,8 +1,8 @@
 # Build stage
 FROM node:20-alpine AS base
 WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY . .
 
 FROM base AS build

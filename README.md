@@ -212,3 +212,26 @@ Push to `master` auto-deploys (Vercel GitHub app). One gotcha: the project's
 **Root Directory** must be set to `frontend` in Vercel project settings —
 without it the build runs from the repo root and fails with
 `Couldn't find any pages or app directory`.
+
+## CI/CD pipeline
+
+| Stage | Where | Trigger | Gate |
+|---|---|---|---|
+| Continuous integration | GitHub Actions (`.github/workflows/ci.yml`) | push / PR | Backend: `compileall` + pipeline smoke tests (`pytest tests`) on an isolated SQLite DB. Frontend: `tsc --noEmit` + production `next build` (bakes `NEXT_PUBLIC_API_URL`) |
+| Backend deploy | Render web service `cyberrakshak-api` | push to `master` (auto-deploy, `Auto Deploy: yes`) | `render.yaml` / service config; env vars incl. `DATABASE_URL`, `JWT_SECRET`, `SEED_ADMIN_PASSWORD` |
+| Frontend deploy | Vercel project `cyberrakshak-frontend` | push to `master` | Root Directory `frontend`, static export to `out` |
+
+Notes:
+
+- The backend smoke suite is the source of truth for the data pipeline
+  (seed → auth → agent registration → agent-token heartbeat → ingestion →
+  persistence → scoped stats → dashboard aggregation). It never touches the
+  production database — `tests/conftest.py` forces a throwaway SQLite URL
+  before the app is imported.
+- Dependency locks keep builds reproducible: `frontend/package-lock.json`
+  (`npm ci`) and `backend/requirements*.txt` (pinned ranges).
+- If a secret is ever needed in CI build stops, pass it via GitHub repository
+  variables/secrets — never commit it. `NEXT_PUBLIC_API_URL` defaults to the
+  live backend via the `vars.NEXT_PUBLIC_API_URL` repository variable.
+- Runtime artifacts (`.env`, `*.db`, logs, event spools, agent live configs
+  with tokens) are gitignored and never in the repository.
