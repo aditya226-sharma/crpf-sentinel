@@ -26,6 +26,9 @@ frontend/.next/
 agent/spool/*.jsonl
 *.log
 
+# Live agent config (contains agent API token)
+agent/config/agent.live.yaml
+
 # OS
 .DS_Store
 *.tsbuildinfo
