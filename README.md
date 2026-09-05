@@ -191,3 +191,19 @@ frontend/         # Next.js 15 dashboard
                   #   search, threat-analytics, assets, units, agents,
                   #   users, reports, audit-logs, settings
 ```
+
+## Deployment (Vercel)
+
+The dashboard (`frontend/`) deploys as a static export from the `master`
+branch. Vercel project settings used for the CI job:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `frontend` |
+| Framework | Next.js |
+| Output Directory | `out` |
+| Production Branch | `master` |
+| Env var `NEXT_PUBLIC_API_URL` | `https://cyberrakshak-api.onrender.com` |
+
+`vercel.json` maps unknown paths (e.g. the removed `/demo` page) to a real
+HTTP 404.
