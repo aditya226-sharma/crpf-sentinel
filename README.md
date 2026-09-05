@@ -207,3 +207,8 @@ branch. Vercel project settings used for the CI job:
 
 `vercel.json` maps unknown paths (e.g. the removed `/demo` page) to a real
 HTTP 404.
+
+Push to `master` auto-deploys (Vercel GitHub app). One gotcha: the project's
+**Root Directory** must be set to `frontend` in Vercel project settings —
+without it the build runs from the repo root and fails with
+`Couldn't find any pages or app directory`.
