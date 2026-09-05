@@ -18,6 +18,7 @@ class Agent(Base, IdMixin, TimestampMixin):
     cpu_usage = Column(Float, nullable=False, default=0.0)
     memory_usage = Column(Float, nullable=False, default=0.0)
     buffer_size = Column(Integer, nullable=False, default=0)
+    simulated = Column(Boolean, nullable=False, default=False, index=True)
     auth_token_hash = Column(String(64), nullable=True)
     is_enabled = Column(Boolean, nullable=False, default=True)
     registered_by = Column(String(32), ForeignKey("users.id"), nullable=True)

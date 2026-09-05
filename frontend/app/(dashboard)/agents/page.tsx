@@ -122,6 +122,7 @@ export default function AgentsPage() {
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <StatusBadge status={agent.status} className="text-[9px]" />
+                      {agent.simulated && <Badge variant="outline" className="text-[9px]">simulated</Badge>}
                       {!agent.is_enabled && <Badge variant="default" className="text-[9px]">disabled</Badge>}
                     </div>
                   </TableCell>

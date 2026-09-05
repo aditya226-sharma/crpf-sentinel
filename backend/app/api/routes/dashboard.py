@@ -18,10 +18,20 @@ from app.schemas.dashboard import DashboardSummary
 router = APIRouter(tags=["dashboard"])
 
 RANGE_SECONDS = {"1h": 3600, "6h": 21600, "24h": 86400, "7d": 604800, "30d": 2592000}
+ONLINE_WINDOW = timedelta(seconds=120)
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _recently_seen(agent: Agent, now: datetime) -> bool:
+    last = agent.last_seen_at
+    if last is None:
+        return False
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    return now - last <= ONLINE_WINDOW
 
 
 def _bucket_expr(db: Session, period: str, model=None, time_col: str = "timestamp"):
@@ -137,9 +147,9 @@ def dashboard_summary(
     high_count = high.scalar() or 0
 
     agents_total = scoped(db.query(func.count(Agent.id)), Agent.unit_id).scalar() or 0
-    agents_online = (
-        scoped(db.query(func.count(Agent.id)).filter(Agent.status == "online"), Agent.unit_id).scalar() or 0
-    )
+    agents_online = scoped(
+        db.query(func.count(Agent.id)).filter(Agent.status == "online"), Agent.unit_id
+    ).scalar() or 0
     active_pct = round(agents_online / agents_total * 100, 1) if agents_total else 0
 
     units_total = scoped(db.query(func.count(Unit.id)), Unit.id).scalar() or 0
@@ -148,14 +158,14 @@ def dashboard_summary(
     active_threats = _active_threats(db, unit_ids, limit=6)
     units_overview = _unit_overview(db, unit_ids)
     agent_health = _agent_health(db, unit_ids, limit=8)
-    top_rules = _top_rules(db, unit_ids, limit=5)
+    top_rules = _top_rules(db, unit_ids, since, limit=5)
 
     return DashboardSummary(
         total_events=_kpi("Total Events", total_events, event_change, f"vs previous {period}", detail="Normalized events ingested"),
         critical_alerts=_kpi("Critical Alerts", critical_count, None, "period total", detail="Severity: critical", status="critical" if critical_count else "ok"),
         high_alerts=_kpi("High Severity Alerts", high_count, None, "period total", detail="Severity: high", status="high" if high_count else "ok"),
-        active_agents=_kpi("Active Windows Agents", f"{agents_online} / {agents_total}", active_pct, "online / total", detail="Heartbeat within 60s"),
-        monitored_units=_kpi("Monitored Units", units_total, None, "all units", detail="Deployed CRPF demo units"),
+        active_agents=_kpi("Active Agents", f"{agents_online} / {agents_total}", active_pct, "online / total", detail="Heartbeat received in the last 120s"),
+        monitored_units=_kpi("Monitored Units", units_total, None, "all units", detail="Deployed CRPF units", status="ok"),
         risk_score=_kpi("Current Risk Score", _platform_risk(db, unit_ids), None, "computed", detail="Weighted from open alerts"),
         timeline=_timeline(db, period, unit_ids),
         severity=_severity_distribution(db, unit_ids),
@@ -199,6 +209,7 @@ def _live_events(db: Session, unit_ids: list[str] | None, limit: int = 12) -> li
             "username": e.username,
             "matched_rule_id": e.matched_rule_id,
             "matched_rule_name": rules.get(e.matched_rule_id) if e.matched_rule_id else None,
+            "simulated": e.simulated,
             "id": e.id,
         }
         for e in events
@@ -313,27 +324,38 @@ def _agent_health(db: Session, unit_ids: list[str] | None, limit: int = 8) -> li
             "events_per_sec": a.events_per_sec,
             "cpu_usage": a.cpu_usage,
             "memory_usage": a.memory_usage,
+            "simulated": a.simulated,
             "status": a.status,
         }
         for a, u in q.all()
     ]
 
 
-def _top_rules(db: Session, unit_ids: list[str] | None, limit: int = 5) -> list[dict]:
+def _top_rules(
+    db: Session, unit_ids: list[str] | None, since: datetime, limit: int = 5
+) -> list[dict]:
     q = (
-        db.query(DetectionRule)
-        .order_by(DetectionRule.times_matched.desc())
+        db.query(NormalizedEvent.matched_rule_id, func.count(NormalizedEvent.id))
+        .filter(
+            NormalizedEvent.timestamp >= since,
+            NormalizedEvent.matched_rule_id.isnot(None),
+        )
+        .group_by(NormalizedEvent.matched_rule_id)
+        .order_by(func.count(NormalizedEvent.id).desc())
         .limit(limit)
     )
+    if unit_ids:
+        q = q.filter(NormalizedEvent.unit_id.in_(unit_ids))
+    rules = {r.rule_id: r for r in db.query(DetectionRule).all()}
     return [
         {
-            "rule_id": r.rule_id,
-            "name": r.name,
-            "severity": r.severity,
-            "times_matched": r.times_matched,
-            "mitre_technique": r.mitre_technique,
+            "rule_id": rule_id,
+            "name": rules[rule_id].name if rule_id in rules else rule_id,
+            "severity": rules[rule_id].severity if rule_id in rules else None,
+            "times_matched": count,
+            "mitre_technique": rules[rule_id].mitre_technique if rule_id in rules else None,
         }
-        for r in q.all()
+        for rule_id, count in q.all()
     ]
 
 

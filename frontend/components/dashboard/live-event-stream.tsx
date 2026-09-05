@@ -37,7 +37,12 @@ function EventRow({ event, index }: { event: LiveEventItem; index: number }) {
           <span className="ml-1.5 text-accent">· {event.matched_rule_id}</span>
         )}
       </span>
-      <SeverityBadge severity={event.severity} className="shrink-0 text-[8px]" />
+      <span className="flex shrink-0 items-center gap-1.5">
+        {event.simulated && (
+          <Badge variant="outline" className="text-[8px]">simulated</Badge>
+        )}
+        <SeverityBadge severity={event.severity} className="text-[8px]" />
+      </span>
     </div>
   );
 }

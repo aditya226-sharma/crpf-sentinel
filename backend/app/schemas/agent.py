@@ -18,6 +18,7 @@ class AgentOut(BaseModel):
     cpu_usage: float
     memory_usage: float
     buffer_size: int
+    simulated: bool = False
     last_sync_status: str | None = None
     is_enabled: bool
     created_at: datetime | None = None
@@ -32,6 +33,7 @@ class AgentRegister(BaseModel):
     ip_address: str | None = None
     os_version: str | None = None
     agent_version: str | None = None
+    simulated: bool = False
 
 
 class AgentRegistered(BaseModel):

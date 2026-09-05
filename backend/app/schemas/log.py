@@ -52,6 +52,7 @@ class EventOut(BaseModel):
     status_code: str | None = None
     severity: str
     is_suspicious: bool
+    simulated: bool = False
     matched_rule_id: str | None = None
     extra: dict[str, Any] | None = None
 

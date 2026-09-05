@@ -79,6 +79,7 @@ def ingest_payload(
         severity=normalized["severity"],
         parser_version=normalized["parser_version"],
         is_suspicious=False,
+        simulated=agent.simulated,
         extra=normalized["extra"],
     )
     db.add(event_row)

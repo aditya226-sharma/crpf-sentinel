@@ -233,7 +233,7 @@ function UnitOverviewTable({ units }: { units: { id: string; unit_code: string; 
   );
 }
 
-function AgentHealthTable({ items }: { items: { id: string; hostname: string; unit_name: string | null; status: string; events_per_sec: number; cpu_usage: number; memory_usage: number }[] }) {
+function AgentHealthTable({ items }: { items: { id: string; hostname: string; unit_name: string | null; status: string; events_per_sec: number; cpu_usage: number; memory_usage: number; simulated: boolean }[] }) {
   return (
     <Card>
       <CardHeader className="pb-1">
@@ -260,9 +260,12 @@ function AgentHealthTable({ items }: { items: { id: string; hostname: string; un
                 <TableCell className="text-right font-mono text-xs">{a.events_per_sec.toFixed(1)}</TableCell>
                 <TableCell className="text-right font-mono text-xs">{a.cpu_usage.toFixed(1)}%</TableCell>
                 <TableCell className="text-right font-mono text-xs">{a.memory_usage.toFixed(1)}%</TableCell>
-                <TableCell>
-                  <StatusBadge status={a.status} className="text-[9px]" />
-                </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <StatusBadge status={a.status} className="text-[9px]" />
+                      {a.simulated && <Badge variant="outline" className="text-[9px]">simulated</Badge>}
+                    </div>
+                  </TableCell>
               </TableRow>
             ))}
           </TableBody>

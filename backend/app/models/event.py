@@ -27,5 +27,6 @@ class NormalizedEvent(Base, TimestampMixin):
     severity = Column(String(20), nullable=False, default="informational")
     parser_version = Column(String(10), nullable=True)
     is_suspicious = Column(Boolean, nullable=False, default=False)
+    simulated = Column(Boolean, nullable=False, default=False, index=True)
     matched_rule_id = Column(String(32), nullable=True, index=True)
     extra = Column(JSON, nullable=True)

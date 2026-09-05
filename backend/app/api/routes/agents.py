@@ -39,6 +39,7 @@ def _to_out(a: Agent, units: dict[str, Unit]) -> AgentOut:
         cpu_usage=a.cpu_usage,
         memory_usage=a.memory_usage,
         buffer_size=a.buffer_size,
+        simulated=a.simulated,
         last_sync_status=a.last_sync_status,
         is_enabled=a.is_enabled,
         created_at=a.created_at,
@@ -114,6 +115,7 @@ def register_agent(
         status="offline",
         auth_token_hash=token_hash,
         is_enabled=True,
+        simulated=body.simulated,
         registered_by=user.id,
     )
     db.add(agent)

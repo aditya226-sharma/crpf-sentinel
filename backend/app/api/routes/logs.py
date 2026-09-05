@@ -64,6 +64,7 @@ def _event_to_out(e: NormalizedEvent, units: dict[str, Unit], rules: dict[str, s
         status_code=e.status_code,
         severity=e.severity,
         is_suspicious=e.is_suspicious,
+        simulated=e.simulated,
         matched_rule_id=e.matched_rule_id,
         extra=e.extra,
     )
@@ -213,6 +214,8 @@ def ingest(
         agent.memory_usage = _coerce_float(hb.get("memory_usage"), agent.memory_usage)
         agent.buffer_size = _coerce_int(hb.get("buffer_size"), agent.buffer_size)
         agent.last_sync_status = str(hb.get("sync_status", agent.last_sync_status or ""))[:60]
+        agent.status = "online"
+        agent.last_seen_at = datetime.now(timezone.utc)
         db.add(agent)
 
     accepted = 0

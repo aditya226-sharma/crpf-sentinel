@@ -38,6 +38,7 @@ class LiveEventItem(BaseModel):
     username: str | None = None
     matched_rule_id: str | None = None
     matched_rule_name: str | None = None
+    simulated: bool = False
     id: int | None = None
 
 
@@ -66,6 +67,7 @@ class AgentHealthItem(BaseModel):
     events_per_sec: int
     cpu_usage: float
     memory_usage: float
+    simulated: bool = False
     status: str
 
 

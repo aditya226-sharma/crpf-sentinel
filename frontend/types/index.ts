@@ -68,6 +68,7 @@ export interface Agent {
   cpu_usage: number;
   memory_usage: number;
   buffer_size: number;
+  simulated: boolean;
   last_sync_status: string | null;
   is_enabled: boolean;
   created_at: string | null;
@@ -236,6 +237,7 @@ export interface LiveEventItem {
   username: string | null;
   matched_rule_id: string | null;
   matched_rule_name: string | null;
+  simulated: boolean;
 }
 
 export interface ActiveThreat {
@@ -264,6 +266,7 @@ export interface AgentHealthItem {
   events_per_sec: number;
   cpu_usage: number;
   memory_usage: number;
+  simulated: boolean;
   status: string;
 }
 
