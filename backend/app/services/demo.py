@@ -90,9 +90,10 @@ def ensure_sim_agents(db: Session, units: dict[str, Unit]) -> dict[str, Agent]:
     return agents
 
 
-def _push(db: Session, agent: Agent, unit: Unit, event_id: int, when: datetime, data: dict) -> None:
+def _push(db: Session, agent: Agent, unit: Unit, event_id: int, when: datetime, data: dict,
+          *, commit: bool = True, publish_event: bool = True) -> None:
     payload = _structured_payload(event_id, agent.hostname, when, data)
-    ingest_payload(db, payload, agent=agent, unit=unit)
+    ingest_payload(db, payload, agent=agent, unit=unit, commit=commit, publish_event=publish_event)
 
 
 def simulate_attack(db: Session, scenario: str = "espionage") -> dict:
@@ -199,7 +200,8 @@ def seed_demo_log_data(db: Session) -> dict:
             for _ in range(rng.randint(6, 14)):
                 when = day.replace(hour=hour, minute=rng.randint(0, 59), second=rng.randint(0, 59))
                 _push(db, agent, unit, 4624, when,
-                      {"SubjectUserName": rng.choice(USERS_POOL), "IpAddress": "10.0.0.8", "LogonType": "3"})
+                      {"SubjectUserName": rng.choice(USERS_POOL), "IpAddress": "10.0.0.8", "LogonType": "3"},
+                      commit=False, publish_event=False)
                 events += 1
             for _ in range(rng.randint(8, 20)):
                 when = day.replace(hour=hour, minute=rng.randint(0, 59), second=rng.randint(0, 59))
@@ -207,7 +209,8 @@ def seed_demo_log_data(db: Session) -> dict:
                       {"SubjectUserName": rng.choice(USERS_POOL),
                        "NewProcessName": "C:\\Windows\\System32\\"
                        + rng.choice(["explorer.exe", "chrome.exe", "winword.exe"]),
-                       "CommandLine": "C:\\Windows\\System32\\svchost.exe -k netsvcs"})
+                       "CommandLine": "C:\\Windows\\System32\\svchost.exe -k netsvcs"},
+                      commit=False, publish_event=False)
                 events += 1
 
         if rng.random() < 0.5:
@@ -217,7 +220,8 @@ def seed_demo_log_data(db: Session) -> dict:
             src = "198.51.100.7"
             for i in range(rng.randint(7, 12)):
                 _push(db, agents[code], units[code], 4625, when + timedelta(seconds=8 * i),
-                      {"SubjectUserName": target, "IpAddress": src, "Status": "0xC000006A"})
+                      {"SubjectUserName": target, "IpAddress": src, "Status": "0xC000006A"},
+                      commit=False, publish_event=False)
                 events += 1
             bursts += 1
 
@@ -225,7 +229,8 @@ def seed_demo_log_data(db: Session) -> dict:
             code = rng.choice(unit_codes)
             when = day.replace(hour=rng.randint(0, 23), minute=rng.randint(0, 59))
             _push(db, agents[code], units[code], 1102, when,
-                  {"SubjectUserName": "administrator", "LogName": "Security"})
+                  {"SubjectUserName": "administrator", "LogName": "Security"},
+                  commit=False, publish_event=False)
             events += 1
 
     db.commit()

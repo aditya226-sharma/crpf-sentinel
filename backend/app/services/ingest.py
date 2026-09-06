@@ -25,8 +25,16 @@ def ingest_payload(
     agent: Agent,
     unit: Unit | None,
     parser_format: str = "windows",
+    commit: bool = True,
+    publish_event: bool = True,
 ) -> dict[str, Any]:
-    """Parse, normalize, store and run detection for a single raw payload."""
+    """Parse, normalize, store and run detection for a single raw payload.
+
+    ``commit=False`` and ``publish_event=False`` let bulk seeding (demo
+    backdrop / case-record replay) skip the per-event commit and websocket
+    fan-out; the caller commits once at the end. Detection and risk scoring
+    run identically.
+    """
     try:
         parser = ParserRegistry.get(parser_format)
     except ValueError:
@@ -110,26 +118,28 @@ def ingest_payload(
         log_row.normalized_event_id = event_row.id
         db.add(log_row)
 
-    db.commit()
+    if commit:
+        db.commit()
 
-    unit_name = unit.name if unit else None
-    publish(
-        "event",
-        {
-            "id": event_row.id,
-            "timestamp": event_row.timestamp.isoformat(),
-            "unit_id": normalized["unit_id"],
-            "unit_name": unit_name,
-            "hostname": normalized["hostname"],
-            "event_id": normalized["event_id"],
-            "category": normalized["category"],
-            "action": normalized["action"],
-            "severity": normalized["severity"],
-            "source_ip": normalized["source_ip"],
-            "username": normalized["username"],
-            "matched_rule_id": matched_ids[0] if matched_ids else None,
-        },
-    )
+    if publish_event:
+        unit_name = unit.name if unit else None
+        publish(
+            "event",
+            {
+                "id": event_row.id,
+                "timestamp": event_row.timestamp.isoformat(),
+                "unit_id": normalized["unit_id"],
+                "unit_name": unit_name,
+                "hostname": normalized["hostname"],
+                "event_id": normalized["event_id"],
+                "category": normalized["category"],
+                "action": normalized["action"],
+                "severity": normalized["severity"],
+                "source_ip": normalized["source_ip"],
+                "username": normalized["username"],
+                "matched_rule_id": matched_ids[0] if matched_ids else None,
+            },
+        )
 
     return {
         "accepted": 1,
