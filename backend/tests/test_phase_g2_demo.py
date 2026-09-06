@@ -4,6 +4,9 @@ These endpoints are admin-gated and must never be reachable by lower roles.
 The simulate path must push events through the real ingestion/detection path.
 """
 
+import os
+
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -114,3 +117,58 @@ def test_reset_after_simulate_is_clean_and_idempotent(client: TestClient, admin_
     assert second.status_code == 200, second.text
     assert second.json()["removed_alerts"] >= 0
     assert second.json()["removed_events"] >= 0
+
+
+@pytest.mark.skipif(
+    not os.environ.get("TEST_POSTGRES_URL"),
+    reason="set TEST_POSTGRES_URL to exercise the Postgres TRUNCATE reset path",
+)
+def test_reset_truncate_path_on_postgres():
+    """Postgres reset must use TRUNCATE and restore the curated baseline fast.
+
+    Skips unless TEST_POSTGRES_URL is set (CI runs on SQLite, where the DELETE
+    fallback is exercised instead).  Guards against the reset silently degrading
+    back to slow row-deletes that die on resource-limited hosts.
+    """
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.database.base import Base
+    from app.database.init_db import seed_roles
+    from app.seed.demo_data import seed_units
+    from app.seed.demo_rules import seed_rules
+    from app.services.demo import reset_demo, seed_demo_log_data
+
+    engine = create_engine(os.environ["TEST_POSTGRES_URL"])
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+
+    try:
+        # Idempotent baseline on a shared test DB; Postgres TRUNCATE ... CASCADE
+        # resolves the circular logs<->normalized_events FK itself.
+        db.execute(text("TRUNCATE TABLE incidents, alerts, logs RESTART IDENTITY CASCADE"))
+        db.commit()
+        seed_roles(db)
+        seed_units(db)
+        seed_rules(db)
+
+        for _ in range(5):
+            seed_demo_log_data(db)
+
+        total = db.execute(text("SELECT count(*) FROM normalized_events")).scalar()
+        assert total > 10_000, f"expected accumulated dataset, got {total}"
+
+        result = reset_demo(db)
+        assert result["removed_events"] >= total, result
+
+        clean = db.execute(text("SELECT count(*) FROM normalized_events")).scalar()
+        assert 0 < clean < 5_000, f"expected reseeded baseline, got {clean}"
+        assert db.execute(text("SELECT count(*) FROM logs")).scalar() == clean
+
+        # Reset must be idempotent.
+        second = reset_demo(db)
+        assert second["removed_events"] <= clean
+    finally:
+        db.close()
+        engine.dispose()

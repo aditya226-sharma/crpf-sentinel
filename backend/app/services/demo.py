@@ -16,17 +16,14 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.security import generate_agent_token
 from app.models.agent import Agent
-from app.models.alert import Alert, AlertEvent
+from app.models.alert import Alert
 from app.models.event import NormalizedEvent
-from app.models.incident import Incident, IncidentAlert, IncidentNote
 from app.models.log import Log
-from app.models.rule import DetectionRule
 from app.models.unit import Unit
-from app.models.user import User
 from app.normalization.engine import normalize_event
 from app.parsers import ParserRegistry
 from app.services.ingest import ingest_payload
