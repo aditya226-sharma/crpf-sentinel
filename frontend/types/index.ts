@@ -341,6 +341,14 @@ export interface GraphCommunity {
   entities: GraphNodeItem[];
 }
 
+export interface QueryResult {
+  template: string;
+  query: string;
+  confidence: "high" | "medium" | "low";
+  explanation: string;
+  results: { label: string; detail: string }[];
+}
+
 export interface Incident {
   id: string;
   incident_id: string;

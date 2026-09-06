@@ -33,6 +33,7 @@ import type {
   GraphNodeItem,
   GraphOverview,
   GraphRelationships,
+  QueryResult,
 } from "@/types";
 
 // Auth
@@ -255,4 +256,8 @@ export const graphService = {
   connectivity: (a: string, b: string) =>
     api.get<{ path: GraphNodeItem[]; hops: number }>(`/api/graph/connectivity?entity_a=${a}&entity_b=${b}`),
   search: (q: string, limit = 20) => api.get<{ items: GraphNodeItem[] }>(`/api/graph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+};
+
+export const queryService = {
+  run: (query: string) => api.post<QueryResult>("/api/query", { query }),
 };

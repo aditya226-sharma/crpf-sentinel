@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import cytoscape, { type Core, type ElementDefinition } from "cytoscape";
 
-import { Activity, Boxes, Fingerprint, GitBranch, Search, Spline, Users } from "lucide-react";
+import { Activity, Boxes, Fingerprint, GitBranch, MessageSquareText, Search, Send, Spline, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { graphService, logService } from "@/services";
-import type { GraphNodeItem, GraphRelationships } from "@/types";
+import { graphService, logService, queryService } from "@/services";
+import type { GraphNodeItem, GraphRelationships, QueryResult } from "@/types";
 import { cn } from "@/lib/utils";
 
 const NODE_COLORS: Record<string, string> = {
@@ -74,6 +74,9 @@ export default function CriminalDashboardPage() {
   const [path, setPath] = useState<GraphNodeItem[] | null>(null);
   const [pathBusy, setPathBusy] = useState(false);
   const [expanding, setExpanding] = useState(false);
+  const [nlQuery, setNlQuery] = useState("");
+  const [nlResult, setNlResult] = useState<QueryResult | null>(null);
+  const [nlBusy, setNlBusy] = useState(false);
 
   const overview = useQuery({ queryKey: ["graph", "overview"], queryFn: graphService.overview, refetchInterval: 60000 });
   const central = useQuery({ queryKey: ["graph", "central"], queryFn: () => graphService.central(30), refetchInterval: 60000 });
@@ -225,6 +228,20 @@ export default function CriminalDashboardPage() {
       setSearching(false);
     }
   }, []);
+
+  const runQuery = useCallback(async () => {
+    if (!nlQuery.trim()) return;
+    setNlBusy(true);
+    setNlResult(null);
+    try {
+      const res = await queryService.run(nlQuery);
+      setNlResult(res);
+    } catch {
+      setNlResult(null);
+    } finally {
+      setNlBusy(false);
+    }
+  }, [nlQuery]);
 
   const runPath = useCallback(async () => {
     if (!pathA || !pathB) return;
@@ -410,6 +427,53 @@ export default function CriminalDashboardPage() {
               )}
               {path && path.length === 0 && (
                 <p className="mt-3 text-[11px] text-muted">No path between the selected entities.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="space-y-0 pb-2">
+              <CardTitle>Ask the Corpus</CardTitle>
+              <CardDescription>Template-based query over alerts, logons and flows</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <MessageSquareText className="absolute left-2.5 top-2.5 h-4 w-4 text-muted" />
+                  <Input
+                    className="pl-8"
+                    placeholder={'e.g. "open high alerts", "failed logons by rpatil", "network scan"'}
+                    value={nlQuery}
+                    onChange={(e) => setNlQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void runQuery();
+                    }}
+                  />
+                </div>
+                <Button size="sm" disabled={!nlQuery.trim() || nlBusy} onClick={() => void runQuery()}>
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {nlBusy && <Skeleton className="h-16 w-full" />}
+              {!nlBusy && nlResult && (
+                <div className="rounded-md border border-border p-3">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-foreground">{nlResult.template}</span>
+                    <Badge variant={nlResult.confidence === "high" ? "default" : "outline"}>
+                      {nlResult.confidence} confidence
+                    </Badge>
+                  </div>
+                  <p className="mb-2 text-[10px] text-muted">{nlResult.explanation}</p>
+                  {nlResult.results.length === 0 && <p className="text-[10px] text-muted">No rows matched — no fabricated answers.</p>}
+                  <ul className="max-h-40 space-y-1 overflow-y-auto">
+                    {nlResult.results.map((r, i) => (
+                      <li key={i} className="text-[11px] leading-snug">
+                        <span className="font-medium text-foreground">{r.label}</span>
+                        <span className="block text-[10px] text-muted">{r.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </CardContent>
           </Card>

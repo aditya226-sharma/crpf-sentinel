@@ -124,6 +124,8 @@ class WindowsEventParser(BaseParser):
     def _parse_dict(self, obj: dict) -> ParsedEvent | None:
         if not isinstance(obj, dict):
             return None
+        if self._is_envelope(obj):
+            obj = obj["data"]
         system = obj.get("System") if isinstance(obj.get("System"), dict) else obj
         event = ParsedEvent()
         event.event_id = self._int(system.get("EventID"))
@@ -163,6 +165,17 @@ class WindowsEventParser(BaseParser):
 
     # ── Shared helpers ─────────────────────────────────────────────────
     @staticmethod
+    def _is_envelope(obj: dict) -> bool:
+        """Detect a collector/API wrapper ({source, raw_json, data}) rather
+        than a straight event payload, so dict-shaped events parse end to end."""
+        inner = obj.get("data")
+        return (
+            isinstance(inner, dict)
+            and obj.get("event_id") is None
+            and any(k in inner for k in ("event_id", "System", "EventData"))
+        )
+
+    @staticmethod
     def _int(value) -> int | None:
         try:
             return int(value)
@@ -178,7 +191,23 @@ class WindowsEventParser(BaseParser):
     # ── High-level extraction for the normalization engine ─────────────
     @staticmethod
     def extract_fields(event: ParsedEvent) -> dict:
-        ed = event.event_data
+        ed = {str(k): v for k, v in event.event_data.items()}
+
+        def canonical(value: str) -> str:
+            return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+        folded = {canonical(k): v for k, v in ed.items()}
+
+        def pick(*keys: str):
+            for key in keys:
+                if ed.get(key) not in (None, ""):
+                    return ed.get(key)
+            for key in keys:
+                value = folded.get(canonical(key))
+                if value not in (None, ""):
+                    return value
+            return None
+
         return {
             "event_id": event.event_id,
             "provider": event.provider,
@@ -186,34 +215,21 @@ class WindowsEventParser(BaseParser):
             "timestamp": event.time_created,
             "user_sid": event.user,
             "username": (
-                ed.get("TargetUserName")
-                or ed.get("SubjectUserName")
-                or ed.get("Account Name")
-                or ed.get("NewAccountName")
+                pick("TargetUserName", "SubjectUserName", "Account Name", "NewAccountName")
             ),
-            "account_domain": (
-                ed.get("TargetDomainName")
-                or ed.get("SubjectDomainName")
-                or ed.get("Account Domain")
-            ),
-            "logon_type": ed.get("LogonType") or ed.get("Logon Type"),
+            "account_domain": pick("TargetDomainName", "SubjectDomainName", "Account Domain"),
+            "logon_type": pick("LogonType", "Logon Type"),
             "source_ip": (
-                ed.get("IpAddress")
-                or ed.get("SourceNetworkAddress")
-                or ed.get("Source IP")
+                pick("IpAddress", "SourceNetworkAddress", "Source IP", "SourceAddress")
             ),
-            "destination_ip": ed.get("DestinationIp") or ed.get("Destination IP"),
-            "process_name": ed.get("NewProcessName") or ed.get("Process Name"),
-            "command_line": (
-                ed.get("CommandLine")
-                or ed.get("Process Command Line")
-                or ed.get("Command line")
-            ),
-            "status_code": ed.get("Status") or ed.get("SubStatus"),
-            "service_name": ed.get("ServiceName"),
-            "image_path": ed.get("ImagePath"),
-            "target_user": ed.get("TargetUserName"),
-            "member_name": ed.get("MemberName"),
-            "privileges": ed.get("PrivilegeList"),
-            "new_account_name": ed.get("NewAccountName"),
+            "destination_ip": pick("DestinationIp", "Destination IP", "DestinationAddress"),
+            "process_name": pick("NewProcessName", "Process Name"),
+            "command_line": pick("CommandLine", "Process Command Line", "Command line"),
+            "status_code": pick("Status", "SubStatus"),
+            "service_name": pick("ServiceName"),
+            "image_path": pick("ImagePath"),
+            "target_user": pick("TargetUserName"),
+            "member_name": pick("MemberName"),
+            "privileges": pick("PrivilegeList"),
+            "new_account_name": pick("NewAccountName"),
         }

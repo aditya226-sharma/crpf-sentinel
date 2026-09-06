@@ -16,6 +16,7 @@ from app.api.routes import (
     ioc,
     logs,
     mitre,
+    query,
     reports,
     rules,
     search,
@@ -46,4 +47,5 @@ api_router.include_router(graph.router)
 api_router.include_router(users.router)
 api_router.include_router(audit.router)
 api_router.include_router(reports.router)
+api_router.include_router(query.router)
 api_router.include_router(stream.router)
