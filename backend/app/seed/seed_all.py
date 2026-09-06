@@ -34,15 +34,23 @@ def seed_all() -> dict:
         case_records = 0
         demo = {}
         if settings.SEED_DEMO_DATA:
-            from app.seed.case_records import seed_case_records
+            # Realistic event/alert backdrop + coherent hero incidents + the
+            # criminal-intelligence nexus, all via the real ingest pipeline
+            # (only in the demo-enabled environment).  Seed only when no events
+            # exist yet: a reset already leaves the curated backdrop in place,
+            # so re-running on every instance restart would pile ~2.8k orphaned
+            # events each time.  Checked first so case-record seeding can never
+            # mask an empty DB and trick the guard into skipping the backdrop.
+            from app.models.event import NormalizedEvent
 
-            case_records = seed_case_records(db)
-            # Realistic event/alert backdrop + coherent hero incidents via the
-            # real pipeline (only in the demo-enabled environment).
-            from app.services import demo as demo_svc
+            has_backdrop = db.query(NormalizedEvent.id).limit(1).first() is not None
+            if not has_backdrop:
+                from app.seed.case_records import seed_case_records
+                from app.services import demo as demo_svc
 
-            demo["log_backdrop"] = demo_svc.seed_demo_log_data(db)
-            demo["hero_incidents"] = demo_svc.seed_hero_incidents(db)
+                case_records = seed_case_records(db)
+                demo["log_backdrop"] = demo_svc.seed_demo_log_data(db)
+                demo["hero_incidents"] = demo_svc.seed_hero_incidents(db)
         db.commit()
         return {"rules": rules_seeded, "units": len(units), "case_records": case_records, "demo": demo}
     finally:

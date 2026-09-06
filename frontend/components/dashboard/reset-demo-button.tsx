@@ -21,8 +21,8 @@ export function ResetDemoButton({ onResetComplete }: { onResetComplete?: () => v
   const [message, setMessage] = useState<string | null>(null);
 
   const pollForDone = useCallback(async () => {
-    // Background mode: poll stats endpoint until event count drops below a threshold
-    // indicating the reseed is in progress.  The fresh reseed always produces ~3k events.
+    // Background mode: poll stats endpoint until event count is back near the
+    // curated baseline (~2.8k; possibly +2.8k if an instance re-seed overlaps).
     let attempts = 0;
     const maxAttempts = 30; // 30 × 4s = 2 min max
     while (attempts < maxAttempts) {
@@ -30,7 +30,7 @@ export function ResetDemoButton({ onResetComplete }: { onResetComplete?: () => v
       try {
         const data = await statsService.get();
         const events = data.total_events ?? 0;
-        if (events > 0 && events < 5000) {
+        if (events > 0 && events < 8000) {
           setStatus("done");
           setMessage(`Dashboard restored — ${events.toLocaleString()} events, ${data.total_alerts} alerts`);
           onResetComplete?.();
