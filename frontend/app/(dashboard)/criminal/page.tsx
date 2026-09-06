@@ -464,6 +464,11 @@ export default function CriminalDashboardPage() {
                     </Badge>
                   </div>
                   <p className="mb-2 text-[10px] text-muted">{nlResult.explanation}</p>
+                  {nlResult.narrative && (
+                    <p className="mb-2 rounded-md border border-accent/30 bg-accent/5 p-2 text-[11px] leading-snug text-foreground">
+                      {nlResult.narrative}
+                    </p>
+                  )}
                   {nlResult.results.length === 0 && <p className="text-[10px] text-muted">No rows matched — no fabricated answers.</p>}
                   <ul className="max-h-40 space-y-1 overflow-y-auto">
                     {nlResult.results.map((r, i) => (

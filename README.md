@@ -73,7 +73,8 @@ Reserve Police Force (CRPF) units — submitted for **Smart India Hackathon
    `GRAPH_BACKEND=neo4j` (see `docker-compose.yml`).
 8. **Query** — `POST /api/query` is a template-first, explainable query bar
    (open alerts, failed logons, network bursts, graph paths) with confidence +
-   provenance; no generative inference.
+   provenance; a strictly-grounded LLM narrative can be layered on behind the
+   `QUERY_LLM_ENABLED` flag.
 9. **Notify & Investigate** — alerts and events stream over Server-Sent Events
    to the frontend (`/api/stream/live`) and become dashboard notifications.
    Open alerts can be grouped into incidents (`/incidents`) with a
@@ -163,6 +164,16 @@ Backend (`.env`, see `backend/.env.example`):
 | `SEED_DEMO_DATA`          | `false`                  | seed synthetic units/agents/logs + ~180 case records for /criminal |
 | `SEED_ADMIN_USERNAME`     | `admin`                  | seeded super-admin             |
 | `SEED_ADMIN_PASSWORD`     | `Sentinel@123`           | seeded password                |
+| `QUERY_LLM_ENABLED`       | `false`                  | off; when on, `/api/query` adds a grounded-narrative summary (see below) |
+| `QUERY_LLM_BASE_URL`      | `https://api.openai.com/v1` | OpenAI-compatible chat-completions endpoint |
+| `QUERY_LLM_API_KEY`       | _(empty)_                | required when `QUERY_LLM_ENABLED=true` |
+| `QUERY_LLM_MODEL`         | `gpt-4o-mini`            | model id used for the narrative |
+
+> **Query bar + LLM.** `POST /api/query` is template-first and explainable by
+> default (no inference). Set `QUERY_LLM_ENABLED=true` to layer a strictly
+> grounded natural-language narrative over the template results — the model is
+> instructed to use only the returned rows and to say plainly when none match;
+> any LLM failure silently degrades back to the template answer.
 
 Agent (`CYBERRAKSHAK_*` env vars override `agent/config/agent.yaml`):
 

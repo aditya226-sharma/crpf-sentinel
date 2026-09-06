@@ -347,6 +347,7 @@ export interface QueryResult {
   confidence: "high" | "medium" | "low";
   explanation: string;
   results: { label: string; detail: string }[];
+  narrative?: string;
 }
 
 export interface Incident {

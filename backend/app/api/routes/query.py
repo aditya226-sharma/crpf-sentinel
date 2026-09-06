@@ -3,8 +3,10 @@
 Explainable, template-first: the query string is matched against a small set
 of explicit templates (open alerts, failed logons, graph paths, network
 bursts). A template either matches with a confidence score or the request
-falls back to guidance — there is NO generative/AI inference here. Any future
-LLM layer plugs in behind this same interface and stays feature-flagged.
+falls back to guidance — there is NO generative/AI inference here by default.
+When ``QUERY_LLM_ENABLED`` is on, a strictly-grounded ``narrative`` is layered
+over the template results (see ``app/services/query_llm.py``); it cannot
+fabricate rows and degrades to template-only on any failure.
 
 Synthetic-data caveat: when SEED_DEMO_DATA is off, results may be empty;
 that is expected, the endpoint does not fabricate answers.
@@ -21,6 +23,7 @@ from app.models.alert import Alert
 from app.models.event import NormalizedEvent
 from app.models.unit import Unit
 from app.models.user import User
+from app.services.query_llm import summarize as maybe_narrate
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -36,7 +39,11 @@ def run_query(
     db: Session = Depends(get_db),
 ):
     query = (body.get("query") or "").strip()
-    return _answer(db, query)
+    answer = _answer(db, query)
+    narrative = maybe_narrate(query, answer)
+    if narrative:
+        answer["narrative"] = narrative
+    return answer
 
 
 def _answer(db: Session, query: str) -> dict:

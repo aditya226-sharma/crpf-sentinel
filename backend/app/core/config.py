@@ -43,6 +43,16 @@ class Settings(BaseSettings):
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = ""
 
+    # Template query bar — optional grounding layer. The /api/query endpoint is
+    # always template-first and explainable; QUERY_LLM_ENABLED layers a
+    # strictly-grounded narrative (an OpenAI-compatible chat completions call)
+    # on top of the structured template results. Never fabricates — if there is
+    # no data, it says so. Default OFF.
+    QUERY_LLM_ENABLED: bool = False
+    QUERY_LLM_BASE_URL: str = "https://api.openai.com/v1"
+    QUERY_LLM_API_KEY: str = ""
+    QUERY_LLM_MODEL: str = "gpt-4o-mini"
+
     # CORS
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 

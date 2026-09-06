@@ -120,3 +120,56 @@ def test_query_graph_path_hint(client: TestClient, admin_headers: dict[str, str]
     body = res.json()
     assert body["template"] == "graph_path"
     assert any("Imran Qureshi" in r["label"] for r in body["results"])
+
+
+class _FakeLLMSettings:
+    QUERY_LLM_ENABLED = True
+    QUERY_LLM_API_KEY = "sk-fake-0123456789abcdef"
+    QUERY_LLM_BASE_URL = "https://llm.invalid/v1"
+    QUERY_LLM_MODEL = "test-model"
+
+
+def test_query_llm_off_by_default(client: TestClient, admin_headers: dict[str, str]):
+    res = client.post("/api/query", headers=admin_headers, json={"query": "open alerts"})
+    assert res.status_code == 200
+    assert "narrative" not in res.json()
+
+
+def test_query_llm_grounded_narrative_when_enabled(
+    client: TestClient, admin_headers: dict[str, str], monkeypatch
+):
+    import app.services.query_llm as llm_mod
+
+    calls: dict = {}
+    monkeypatch.setattr(llm_mod, "get_settings", lambda: _FakeLLMSettings())
+    monkeypatch.setattr(
+        llm_mod,
+        "_chat_completion",
+        lambda url, key, payload: calls.update(url=url, key=key, payload=payload)
+        or "Three open alerts are pending; the highest risk is the VPN misconfiguration.",
+    )
+
+    res = client.post("/api/query", headers=admin_headers, json={"query": "open alerts"})
+    body = res.json()
+    assert body["template"] == "open_alerts"
+    assert "narrative" in body
+    assert "highest risk is the VPN" in body["narrative"]
+    assert calls["url"] == "https://llm.invalid/v1"
+    assert calls["key"] == "sk-fake-0123456789abcdef"
+    roles = {m["role"] for m in calls["payload"]["messages"]}
+    assert roles == {"system", "user"}
+    assert '"user_question": "open alerts"' in calls["payload"]["messages"][1]["content"]
+
+
+def test_query_llm_degrades_on_failure(
+    client: TestClient, admin_headers: dict[str, str], monkeypatch
+):
+    import app.services.query_llm as llm_mod
+
+    monkeypatch.setattr(llm_mod, "get_settings", lambda: _FakeLLMSettings())
+    monkeypatch.setattr(llm_mod, "_chat_completion", lambda *a, **k: (_ for _ in ()).throw(OSError("boom")))
+
+    res = client.post("/api/query", headers=admin_headers, json={"query": "open alerts"})
+    body = res.json()
+    assert body["template"] == "open_alerts"
+    assert "narrative" not in body
