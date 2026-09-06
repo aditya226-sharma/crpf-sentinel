@@ -54,7 +54,7 @@ def _answer(db: Session, query: str) -> dict:
     unit_name = unit_code.group(1) if unit_code else None
     unit_ids = _matched_unit_ids(db, unit_name) if unit_name else None
 
-    if any(k in lowered for k in ("open alert", "current alert", "alerts today", "active alert")):
+    if "alert" in lowered and any(k in lowered for k in ("open", "current", "today", "active", "acknowledge")):
         return _open_alerts(db, query, severity=_SEVERITY_RE.search(lowered), unit_ids=unit_ids)
 
     if any(k in lowered for k in ("failed log", "failed login", "failed logon", "brute force", "4625")):
