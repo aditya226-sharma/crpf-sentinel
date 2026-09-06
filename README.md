@@ -2,13 +2,24 @@
 
 A Security Information and Event Management (SIEM) platform for Central
 Reserve Police Force (CRPF) units — submitted for **Smart India Hackathon
-(SIH)**. The system ingests Windows Event Logs from endpoint agents, normalizes
-them, runs correlation + MITRE ATT&CK–mapped detection rules, and surfaces
-alerts in a live React dashboard with role-based access control.
+(SIH)**. A universal log pre-processing framework (single dispatch point:
+`ParserRegistry`/`BaseParser`) powers two independent workspaces:
 
-> **Live deployment.** The platform is deployed for live monitoring; data comes
-> only from registered agents shipping real Windows Event Logs. No synthetic
-> data is generated at runtime.
+- **Log Intelligence** — Windows Event Logs, Syslog/CEF, NetFlow and IPsec
+  VPN events are parsed, normalized, correlated, and MITRE ATT&CK–mapped into
+  alerts, incidents and risk scores with a live React dashboard and
+  role-based access control.
+- **Criminal Intelligence** — an entity/relationship graph over case records
+  (persons, phones, vehicles, accounts, locations, cases) with network map,
+  community detection, hub analysis and shortest-path search.
+
+> **Live deployment.** The platform is deployed for live monitoring; log data
+> comes only from registered agents shipping real Windows Event Logs. The
+> Criminal Intelligence workspace is populated with **synthetic case records**
+> (fabricated names, numbers, vehicle and bank identifiers) that are generated
+> only when `SEED_DEMO_DATA=true` and are clearly labelled as demo data in the
+> UI. No synthetic security-event data is generated at runtime unless an agent
+> is run in `--simulate` mode.
 
 ---
 
@@ -27,7 +38,8 @@ alerts in a live React dashboard with role-based access control.
 ┌────────────┐                          ┌─────────────▼──────────────┐
 │  agent     │                          │          frontend/          │
 │  spool     │                          │  Next.js 15 · TanStack Query│
-└────────────┘                          │  Recharts · live event feed  │
+└────────────┘                          │  Log dashboard (/dashboard) │
+                                        │  Criminal graph (/criminal) │
                                         └────────────────────────────┘
 ```
 
@@ -43,17 +55,30 @@ alerts in a live React dashboard with role-based access control.
 4. **Ship** — `agent/transport/api.py` drains the spool in `max_batch` chunks
    to `POST /api/logs/ingest` (auth: `x-agent-token`), retrying with
    exponential backoff; periodic heartbeats keep the agent `online`.
-5. **Parse & Normalize** — `backend/app/parsers/` → `backend/app/normalization/`
-   extract host, user, source IP, process, command line, etc.
+5. **Parse & Normalize** — every format resolves through
+   `ParserRegistry`/`BaseParser` (`backend/app/parsers/`) into one common
+   event schema via the per-format YAML catalogs
+   (`backend/app/config/formats/*.yaml`). Formats: `windows`, `syslog`,
+   `netflow`, `ipsec` and `case_record`. Adding a source = one parser + one
+   YAML file; the engine never changes.
 6. **Detect** — `backend/app/detection/` runs enabled rules (event filters,
    conditions, correlation windows) and IOC matches
    (`detection/ioc.py`) against the IOC library, raising alerts with risk
-   scores and MITRE mapping.
-7. **Notify** — alerts and events stream over Server-Sent Events to the
-   frontend (`/api/stream/live`) and become dashboard notifications.
-8. **Investigate** — open alerts can be grouped into incidents
-   (`/incidents`) with a triage → investigate → escalate → resolve → close
-   workflow, linked alert/event timelines and investigation notes.
+   scores and MITRE mapping. Dedicated analyzers raise `RULE-NET-001`
+   (NetFlow traffic anomalies) and `RULE-VPN-001` (weak IPsec VPN configs)
+   into the same shared Alert model.
+7. **Graph** — `case_record` events flow through `backend/app/graph/`
+   (extraction → indexer → store) into a per—entity graph. The default store is
+   relational (`GraphNode`/`GraphEdge`); an optional Neo4j store activates with
+   `GRAPH_BACKEND=neo4j` (see `docker-compose.yml`).
+8. **Query** — `POST /api/query` is a template-first, explainable query bar
+   (open alerts, failed logons, network bursts, graph paths) with confidence +
+   provenance; no generative inference.
+9. **Notify & Investigate** — alerts and events stream over Server-Sent Events
+   to the frontend (`/api/stream/live`) and become dashboard notifications.
+   Open alerts can be grouped into incidents (`/incidents`) with a
+   triage → investigate → escalate → resolve → close workflow, linked
+   alert/event timelines and investigation notes.
 
 ---
 
@@ -105,13 +130,18 @@ make agent        # simulated agent (needs AGENT_API_TOKEN=...)
 
 ### Live runbook
 
-1. `make seed`, then open `http://localhost:3000/dashboard`.
+1. `make seed`, then open `http://localhost:3000/` and pick a dashboard (login
+   also lands you on `Role.default_dashboard`).
 2. Register a real agent (**Agents** → **Register**) — the UI returns an API
    token — and run the Windows collector on a monitored endpoint:
    `make agent AGENT_API_TOKEN=<token>`.
 3. Watch the **Live Events** feed populate as the agent ships real Windows
    Event Logs (Security/System/Application channels).
 4. Triage alerts in **Alerts**, correlate with **Logs**, and export **Reports**.
+5. To see the Criminal Intelligence workspace locally, seed the synthetic
+   case corpus: `SEED_DEMO_DATA=true python -m app.seed.seed_all`, then open
+   **/criminal**. Try the **Ask the Corpus** bar, e.g.
+   *"network scan in last hour"* or *"open high alerts"*.
 5. Open **Incidents** (`/incidents`) to group related alerts and drive the
    triage → investigate → escalate → resolve → close workflow.
 6. Open **IOC Library** (`/ioc-library`) to add indicators matched against
@@ -130,7 +160,7 @@ Backend (`.env`, see `backend/.env.example`):
 |---------------------------|--------------------------|--------------------------------|
 | `DATABASE_URL`            | Postgres (docker)        | use `sqlite:///./sentinel.db`  |
 | `JWT_SECRET`              | change-me…               | long random secret             |
-| `SEED_DEMO_DATA`          | `false`                  | seed synthetic units/agents/logs |
+| `SEED_DEMO_DATA`          | `false`                  | seed synthetic units/agents/logs + ~180 case records for /criminal |
 | `SEED_ADMIN_USERNAME`     | `admin`                  | seeded super-admin             |
 | `SEED_ADMIN_PASSWORD`     | `Sentinel@123`           | seeded password                |
 
@@ -158,6 +188,10 @@ Permissions are enforced server-side in `backend/app/core/deps.py`.
 | `super_admin`    | everything incl. users, units, settings, audit, IOCs       |
 | `security_expert`| logs, alerts (manage), rules (manage), incidents, IOC view, agents view, reports |
 | `unit_admin`     | dashboard, logs, alerts, agents/units view, reports (unit-scoped) |
+| `crime_analyst`  | criminal graph (`/criminal`), case-record feed, queries   |
+
+Every role carries a `default_dashboard` (`log` or `criminal`); the login page
+lands the user on their workspace, and `/` lets them switch at any time.
 
 ---
 
@@ -169,8 +203,14 @@ Permissions are enforced server-side in `backend/app/core/deps.py`.
   are batched (≤2000 events) and rate-limited (`RATE_LIMIT_INGEST_PER_MINUTE`).
 - **Live feed** — SSE fan-out in `backend/app/websocket/` for real-time alerts;
   swap to Redis pub/sub for multi-worker deploys.
-- **Postgres** — `docker compose up -d` runs Postgres + backend + frontend;
+- **Postgres** — `docker compose up -d` runs Postgres + optional Neo4j;
   swap `DATABASE_URL` for a managed instance.
+- **Graph backend** — `GRAPH_BACKEND=relational` (default, zero deps) uses
+  `GraphNode`/`GraphEdge` tables; set `GRAPH_BACKEND=neo4j` + `NEO4J_URI/USER/PASSWORD`
+  to use the optional Neo4j store via the same `GraphStore` interface.
+- **Schema migrations** — no Alembic; `init_database()` runs `ensure_columns()`
+  at startup and idempotently ALTERs any post-launch columns (e.g.
+  `roles.default_dashboard`).
 
 ## Project layout
 
@@ -182,18 +222,28 @@ agent/            # endpoint collector (Windows Event Log → HTTPS ingest)
   transport/      #   batched ingest + heartbeat (retry/backoff)
   config/         #   settings + agent.yaml
 backend/          # FastAPI SIEM engine
+  app/parsers/    #   universal parser registry (windows, syslog, netflow,
+                  #   ipsec, case_record) — one dispatch point
+  app/config/formats/  # per-format YAML catalogs
+  app/normalization/   # common event schema (extractors + classifiers)
   app/models/     #   units, agents, logs, events, rules, alerts,
-                  #   incidents, iocs, audit, notifications
-  app/detection/  #   rule engine, correlation, IOC matching, MITRE map
+                  #   incidents, iocs, audit, notifications, graph nodes
+  app/detection/  #   rule engine, correlation, IOC matching, MITRE map,
+                  #   NetFlow/VPN analyzers
+  app/graph/      #   case-record extraction, indexer, store (relational/Neo4j)
   app/api/routes/ #   auth, logs, alerts, incidents, ioc, mitre,
                   #   analytics, assets, search, agents, units, users,
-                  #   rules, reports, audit, stats, stream
-  app/seed/       #   roles, units, rules, SOC seed (+ demo mode)
+                  #   rules, reports, audit, stats, stream, graph, query
+  app/seed/       #   roles, units, rules, SOC seed + case records (demo mode)
+  app/database/   #   init_db (roles, ensure_columns post-launch migrations)
 frontend/         # Next.js 15 dashboard
-  app/(dashboard) #   dashboard, live-events, logs, alerts, incidents,
-                  #   rules, threat-intel, ioc-library, mitre, correlations,
+  app/(dashboard) #   picker (/), log dashboard, criminal graph (/criminal),
+                  #   live-events, logs, alerts, incidents, rules,
+                  #   threat-intel, ioc-library, mitre, correlations,
                   #   search, threat-analytics, assets, units, agents,
                   #   users, reports, audit-logs, settings
+  components/layout  # sidebar/topbar retitle sections for the two workspaces
+docker-compose.yml   # optional Postgres + Neo4j
 ```
 
 ## Deployment (Vercel)
