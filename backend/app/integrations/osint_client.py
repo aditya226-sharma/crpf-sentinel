@@ -62,7 +62,16 @@ def _query_first_unit(db: Session):
 # ---------------------------------------------------------------------------
 
 class OSINTClient:
-    """Thin REST client over the ``vajra-osint`` query API."""
+    """Thin REST client over the ``vajra-osint`` query API.
+
+    Retries transient failures: Render free-tier services cold-start with a
+    ``404`` tagged ``x-render-routing: no-server`` for the request that wakes
+    the instance, so one retry after a couple of seconds is expected behaviour
+    in production.
+    """
+
+    _RETRYABLE = (408, 425, 429, 500, 502, 503, 504)
+    _COLD_START = "no-server"
 
     def __init__(self, base_url: str, api_key: str, *, transport: Any | None = None) -> None:
         self._base_url = base_url.rstrip("/")
@@ -74,26 +83,39 @@ class OSINTClient:
             transport=transport,
         )
 
+    def _get(self, path: str, *, params: dict | None = None, allow_404_empty: bool = False) -> dict | None:
+        """GET with cold-start/transient retry. Returns None when a real 404
+        is acceptable (e.g. unknown entity), otherwise raises on failure."""
+        last_r = None
+        for attempt in range(4):
+            r = self._client.get(path, params=params)
+            last_r = r
+            if r.status_code == 200:
+                return r.json()
+            cold = r.headers.get("x-render-routing") == self._COLD_START
+            if r.status_code == 404 and allow_404_empty and not cold:
+                return None
+            if (cold or r.status_code in self._RETRYABLE) and attempt < 3:
+                logger.debug("OSINT %s transient %s (%s), retry %d", path, r.status_code, "cold" if cold else "transient", attempt + 2)
+                time.sleep(2 * (attempt + 1))
+                continue
+        if last_r is not None:
+            last_r.raise_for_status()
+        raise RuntimeError(f"OSINT GET {path} produced no usable response")
+
     # -- reads -------------------------------------------------------------
 
     def list_entities(self, *, limit: int = 500) -> list[dict]:
-        r = self._client.get("/entities", params={"limit": limit})
-        r.raise_for_status()
-        return r.json().get("entities", [])
+        data = self._get("/entities", params={"limit": limit})
+        return (data or {}).get("entities", [])
 
     def entity_records(self, entity_name: str) -> list[dict]:
-        r = self._client.get(f"/entities/{entity_name}")
-        if r.status_code == 404:
-            return []
-        r.raise_for_status()
-        return r.json().get("records", [])
+        data = self._get(f"/entities/{entity_name}", allow_404_empty=True)
+        return (data or {}).get("records", [])
 
     def entity_links(self, entity_name: str) -> list[dict]:
-        r = self._client.get(f"/entities/{entity_name}/links")
-        if r.status_code == 404:
-            return []
-        r.raise_for_status()
-        return r.json().get("links", [])
+        data = self._get(f"/entities/{entity_name}/links", allow_404_empty=True)
+        return (data or {}).get("links", [])
 
     def close(self) -> None:
         self._client.close()
@@ -255,6 +277,7 @@ class Poller:
            (Task 7 — no fuzzy re-computation).
         """
         start = time.time()
+        owned = db is None
         db = db or SessionLocal()
         new_count = 0
         updated_count = 0
@@ -321,7 +344,7 @@ class Poller:
 
             db.commit()
         finally:
-            if db is SessionLocal:
+            if owned:
                 db.close()
 
         elapsed = round(time.time() - start, 2)

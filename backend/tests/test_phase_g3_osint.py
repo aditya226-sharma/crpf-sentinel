@@ -6,6 +6,7 @@ normalizes, is stored, and is written to the graph exactly like a case record.
 No special-cased ingestion path exists; citation fields survive end-to-end.
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.database.session import SessionLocal
@@ -186,3 +187,61 @@ def test_osint_poller_publishes_new_and_skips_seen(
         r2 = poller.run_cycle(db=db)  # second cycle: nothing new
         assert r2["new_records"] == 0
         assert len(seen) == 1  # unchanged
+
+
+def test_osint_client_retries_render_cold_start_404(monkeypatch):
+    """Render free-tier services answer the wake-up request with a 404 tagged
+    ``x-render-routing: no-server``; the client must retry, not fail."""
+    import httpx
+
+    from app.integrations.osint_client import OSINTClient
+
+    monkeypatch.setattr("app.integrations.osint_client.time.sleep", lambda _: None)
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            return httpx.Response(404, headers={"x-render-routing": "no-server"})
+        return httpx.Response(200, json={"entities": [{"entity_name": "Rakesh Kumar Verma"}]})
+
+    client = OSINTClient("http://osint.test", "k", transport=httpx.MockTransport(handler))
+    entities = client.list_entities()
+    assert entities == [{"entity_name": "Rakesh Kumar Verma"}]
+    assert calls["n"] == 3
+
+
+def test_osint_client_real_404_returns_empty_records():
+    """A genuine 404 (entity not present in OSINT service) must NOT be
+    retried or raised for record/links reads — it means "no data"."""
+    import httpx
+
+    from app.integrations.osint_client import OSINTClient
+
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(404, json={"detail": "not found"})
+
+    client = OSINTClient("http://osint.test", "k", transport=httpx.MockTransport(handler))
+    assert client.entity_records("Ghost") == []
+    assert client.entity_links("Ghost") == []
+    assert calls["n"] == 2  # one request each, no retries
+
+
+def test_osint_client_gives_up_after_cold_start_retries(monkeypatch):
+    """If the OSINT service never comes back, after exhausting retries the
+    client raises so the poll cycle surfaces the error."""
+    import httpx
+
+    from app.integrations.osint_client import OSINTClient
+
+    monkeypatch.setattr("app.integrations.osint_client.time.sleep", lambda _: None)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, headers={"x-render-routing": "no-server"})
+
+    client = OSINTClient("http://osint.test", "k", transport=httpx.MockTransport(handler))
+    with pytest.raises(httpx.HTTPStatusError):
+        client.list_entities()
