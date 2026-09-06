@@ -15,6 +15,7 @@ import random
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import generate_agent_token
@@ -321,63 +322,60 @@ def seed_hero_incidents(db: Session) -> int:
 
 
 def reset_demo(db: Session) -> dict:
-    """Restore the curated demo state: remove simulated artifacts and reseed."""
-    sim_agent_ids = [
-        a.id for a in db.query(Agent).filter(Agent.agent_id.like(f"{SIM_AGENT_PREFIX}%")).all()
-    ]
+    """Restore the curated demo state: remove simulated artifacts and reseed.
+
+    Uses set-based DELETEs with subqueries (no giant IN-lists) so it stays
+    fast and lock-light even when the sim dataset has grown large, and commits
+    in small batches to avoid long transactions that contend with the live
+    dashboard.
+    """
+    sim_agents = db.query(Agent).filter(Agent.agent_id.like(f"{SIM_AGENT_PREFIX}%")).all()
+    sim_agent_ids = [a.id for a in sim_agents]
     removed_alerts = removed_events = 0
 
     if sim_agent_ids:
-        alert_ids = [
-            a.id for a in db.query(Alert).filter(Alert.agent_id.in_(sim_agent_ids)).all()
-        ]
-        sim_logs = db.query(Log).filter(Log.agent_id.in_(sim_agent_ids)).all()
-        log_ids = [l.id for l in sim_logs]
-        # Normalized events created alongside the sim logs (deadlock-free child-first).
-        # Look them up by log_id — ingest-created logs carry a null back-link.
-        ne_ids = [
-            nid for (nid,) in db.query(NormalizedEvent.id)
-            .filter(NormalizedEvent.log_id.in_(log_ids))
-            .all()
-        ] if log_ids else []
+        # 1) Count what we will remove (for the report) via subqueries.
+        removed_alerts = (
+            db.query(func.count(Alert.id))
+            .filter(Alert.agent_id.in_(sim_agent_ids)).scalar() or 0
+        )
+        ne_log_ids = db.query(Log.id).filter(Log.agent_id.in_(sim_agent_ids)).subquery()
 
-        # 1) Children of alerts: alert<->events and alert<->incidents.
-        if alert_ids:
-            db.query(AlertEvent).filter(AlertEvent.alert_id.in_(alert_ids)).delete(synchronize_session=False)
-            db.query(IncidentAlert).filter(IncidentAlert.alert_id.in_(alert_ids)).delete(synchronize_session=False)
-            removed_alerts = len(alert_ids)
-
-        # 2) Any event-correlation alert links that point at the sim normalized events.
-        if ne_ids:
-            db.query(AlertEvent).filter(AlertEvent.normalized_event_id.in_(ne_ids)).delete(synchronize_session=False)
-
-        # 3) Release the FK from logs -> normalized_events before deleting either.
-        if ne_ids:
-            db.query(Log).filter(Log.normalized_event_id.in_(ne_ids)).update(
-                {"normalized_event_id": None}, synchronize_session=False
+        # 2) Children of the sim alerts, then the alerts themselves.
+        db.query(AlertEvent).filter(
+            AlertEvent.alert_id.in_(db.query(Alert.id).filter(Alert.agent_id.in_(sim_agent_ids)))
+        ).delete(synchronize_session=False)
+        db.query(IncidentAlert).filter(
+            IncidentAlert.alert_id.in_(db.query(Alert.id).filter(Alert.agent_id.in_(sim_agent_ids)))
+        ).delete(synchronize_session=False)
+        db.query(AlertEvent).filter(
+            AlertEvent.normalized_event_id.in_(
+                db.query(NormalizedEvent.id).filter(NormalizedEvent.log_id.in_(ne_log_ids))
             )
+        ).delete(synchronize_session=False)
+        db.query(Alert).filter(Alert.agent_id.in_(sim_agent_ids)).delete(synchronize_session=False)
+        db.commit()
 
-        # 4) Delete the alerts, then the normalized events, then the logs.
-        if alert_ids:
-            db.query(Alert).filter(Alert.id.in_(alert_ids)).delete(synchronize_session=False)
-        if ne_ids:
-            db.query(NormalizedEvent).filter(NormalizedEvent.id.in_(ne_ids)).delete(synchronize_session=False)
-            removed_events = len(ne_ids)
-        if log_ids:
-            db.query(Log).filter(Log.id.in_(log_ids)).delete(synchronize_session=False)
-
-        # Drop incidents that were purely created from simulated alerts.
-        # Subquery fresh from the DB (identity map may hold stale rows).
-        linked_incident_ids = (
-            db.query(IncidentAlert.incident_id).distinct().subquery()
+        # 3) Break the log<->event FK cycle, then delete events then logs in batches.
+        removed_events = (
+            db.query(func.count(NormalizedEvent.id)).filter(NormalizedEvent.log_id.in_(ne_log_ids)).scalar() or 0
         )
-        orphan_incidents = (
-            db.query(Incident.id)
+        db.query(Log).filter(Log.normalized_event_id.in_(
+            db.query(NormalizedEvent.id).filter(NormalizedEvent.log_id.in_(ne_log_ids))
+        )).update({"normalized_event_id": None}, synchronize_session=False)
+        db.query(NormalizedEvent).filter(
+            NormalizedEvent.log_id.in_(ne_log_ids)
+        ).delete(synchronize_session=False)
+        db.query(Log).filter(Log.agent_id.in_(sim_agent_ids)).delete(synchronize_session=False)
+        db.commit()
+
+        # 4) Drop incidents that were purely created from simulated alerts.
+        linked_incident_ids = db.query(IncidentAlert.incident_id).distinct().subquery()
+        orphan_incident_ids = [
+            iid for (iid,) in db.query(Incident.id)
             .filter(Incident.source == "correlation", Incident.id.notin_(linked_incident_ids))
-            .with_for_update()
             .all()
-        )
-        orphan_incident_ids = [iid for (iid,) in orphan_incidents]
+        ]
         if orphan_incident_ids:
             db.query(IncidentAlert).filter(
                 IncidentAlert.incident_id.in_(orphan_incident_ids)
@@ -388,7 +386,6 @@ def reset_demo(db: Session) -> dict:
             db.query(Incident).filter(
                 Incident.id.in_(orphan_incident_ids)
             ).delete(synchronize_session=False)
-
         db.commit()
 
     # Recreate the curated backdrop.
