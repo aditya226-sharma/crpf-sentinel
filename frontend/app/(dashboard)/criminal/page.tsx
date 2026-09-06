@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import cytoscape, { type Core, type ElementDefinition } from "cytoscape";
+import coseBilkent from "cytoscape-cose-bilkent";
+
+cytoscape.use(coseBilkent);
 
 import { Activity, Boxes, Fingerprint, GitBranch, MessageSquareText, Search, Send, Spline, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,7 +46,7 @@ function toElements(data: GraphData): ElementDefinition[] {
   const nodes: ElementDefinition[] = [...data.nodes.values()].map((n) => ({
     data: {
       id: n.id,
-      label: `${n.name}${n.entity_type === "person" ? ` (${n.entity_type})` : ` · ${n.entity_type}`}`,
+      label: n.name,
       type: n.entity_type,
       color: NODE_COLORS[n.entity_type] ?? "#94a3b8",
     },
@@ -53,7 +56,6 @@ function toElements(data: GraphData): ElementDefinition[] {
       id: `e${i}`,
       source: e.source,
       target: e.target,
-      label: e.relation,
     },
   }));
   return [...nodes, ...edges];
@@ -143,7 +145,17 @@ export default function CriminalDashboardPage() {
     const elements = toElements(graphData);
     if (cyRef.current) {
       cyRef.current.json({ elements });
-      const layout = cyRef.current.layout({ name: "cose", animate: false });
+      const layout = cyRef.current.layout({
+        name: "cose-bilkent",
+        animate: false,
+        fit: true,
+        padding: 40,
+        quality: "good",
+        nodeRepulsion: 9000,
+        idealEdgeLength: 100,
+        gravity: 0.5,
+        numIter: 1000,
+      } as unknown as cytoscape.LayoutOptions);
       layout.run();
       return;
     }
@@ -156,33 +168,35 @@ export default function CriminalDashboardPage() {
           style: {
             "background-color": "data(color)",
             label: "data(label)",
-            color: "#cbd5e1",
-            "font-size": 10,
-            "text-valign": "bottom",
-            "text-margin-y": 2,
-            "text-wrap": "ellipsis",
-            "text-max-width": "160px",
-            width: "mapData(degree, 0, 40, 18, 46)",
-            height: "mapData(degree, 0, 40, 18, 46)",
+            color: "#e2e8f0",
+            "font-size": 9,
+            "text-valign": "center",
+            "text-background-color": "rgba(15,23,42,0.85)",
+            "text-background-opacity": 1,
+            "text-background-padding": "3px",
+            "text-border-color": "data(color)",
+            "text-border-opacity": 0.4,
+            "text-border-width": 1,
+            "text-wrap": "none",
+            width: "30px",
+            height: "30px",
+            "border-width": 1.5,
+            "border-color": "#0f172a",
           },
         },
         {
           selector: "edge",
           style: {
-            width: 1,
-            "line-color": "#475569",
-            "target-arrow-shape": "triangle",
+            width: 1.2,
+            "line-color": "#334155",
+            "target-arrow-shape": "none",
             "curve-style": "bezier",
-            "arrow-scale": 0.7,
-            label: "data(label)",
-            "font-size": 7,
-            color: "#64748b",
-            "text-rotation": "autorotate",
+            opacity: 0.85,
           },
         },
         {
           selector: "edge.highlighted",
-          style: { width: 3, "line-color": "#f59e0b", "target-arrow-color": "#f59e0b" },
+          style: { width: 3, "line-color": "#f59e0b", "target-arrow-color": "#f59e0b", opacity: 1 },
         },
         {
           selector: "node.highlighted",
@@ -190,10 +204,20 @@ export default function CriminalDashboardPage() {
         },
         {
           selector: "node.selected",
-          style: { "overlay-color": "#38bdf8", "overlay-opacity": 0.6 },
+          style: { "border-width": 3, "border-color": "#38bdf8", "border-opacity": 1 },
         },
       ],
-      layout: { name: "cose", animate: false },
+      layout: {
+        name: "cose-bilkent",
+        animate: false,
+        fit: true,
+        padding: 40,
+        quality: "good",
+        nodeRepulsion: 9000,
+        idealEdgeLength: 100,
+        gravity: 0.5,
+        numIter: 1000,
+      } as unknown as cytoscape.LayoutOptions,
       wheelSensitivity: 0.2,
     });
     cyRef.current.on("tap", "node", (evt) => {
