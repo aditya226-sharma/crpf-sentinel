@@ -69,6 +69,41 @@ def test_query_open_alerts_template(
     assert any("VPN" in r["label"] for r in body["results"])
 
 
+def test_query_open_alerts_severity_case_insensitive(client: TestClient, admin_headers: dict[str, str]):
+    units = client.get("/api/units", headers=admin_headers).json()
+    token = _register_agent(client, admin_headers, "WIN-Q-SEV-001", units[0])
+
+    ing = client.post(
+        "/api/logs/ingest",
+        headers={"x-agent-token": token},
+        json={
+            "agent_id": "WIN-Q-SEV-001",
+            "unit_id": units[0]["id"],
+            "events": [
+                {
+                    "source": "ipsec",
+                    "data": {
+                        "tunnel_name": "TUNNEL-SEV",
+                        "peer_ip": "198.51.100.91",
+                        "dh_group": "1",
+                        "pfs": False,
+                        "cipher": "des-cbc",
+                        "integrity": "md5",
+                    },
+                }
+            ],
+        },
+    )
+    assert ing.json().get("accepted") == 1
+
+    res = client.post("/api/query", headers=admin_headers, json={"query": "OPEN HIGH ALERTS"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["template"] == "open_alerts"
+    assert body["confidence"] == "high"
+    assert any("VPN" in r["label"] for r in body["results"])
+
+
 def test_query_network_burst_template(client: TestClient, admin_headers: dict[str, str]):
     res = client.post("/api/query", headers=admin_headers, json={"query": "network burst in last hour"})
     assert res.status_code == 200

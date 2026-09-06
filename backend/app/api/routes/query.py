@@ -97,8 +97,9 @@ def _open_alerts(db, query, severity, unit_ids):
     q = db.query(Alert).filter(Alert.status.in_(["open", "investigating"]))
     if unit_ids:
         q = q.filter(Alert.unit_id.in_(unit_ids))
-    if severity:
-        q = q.filter(Alert.severity == severity.group(1))
+    severity_value = severity.group(1).lower() if severity else None
+    if severity_value:
+        q = q.filter(Alert.severity == severity_value)
     rows = q.order_by(Alert.risk_score.desc()).limit(10).all()
     results = [
         {
@@ -111,7 +112,7 @@ def _open_alerts(db, query, severity, unit_ids):
         "open_alerts",
         query,
         f"Matched the 'open alerts' template{', constrained to a unit' if unit_ids else ''}"
-        f"{', severity ' + severity.group(1) if severity else ''}.",
+        f"{', severity ' + (severity_value or '') if severity_value else ''}.",
         results,
     )
 
@@ -140,8 +141,6 @@ def _failed_logons(db, query, username, unit_ids):
 
 
 def _graph_path(db, query):
-    import re as _re
-
     entities = re.findall(r"['\"”]([^'\"”]+)['\"”]", query)
     return _seal(
         "graph_path",
