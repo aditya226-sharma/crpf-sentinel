@@ -10,6 +10,7 @@ class Role(Base, IdMixin, TimestampMixin):
     name = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(String(255), nullable=True)
     permissions = Column(JSON, nullable=False, default=list)
+    default_dashboard = Column(String(32), nullable=True)
 
 
 class User(Base, IdMixin, TimestampMixin):

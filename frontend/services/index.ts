@@ -29,6 +29,10 @@ import type {
   Unit,
   UnitStats,
   User,
+  GraphCommunity,
+  GraphNodeItem,
+  GraphOverview,
+  GraphRelationships,
 } from "@/types";
 
 // Auth
@@ -231,4 +235,24 @@ export const assetService = {
     const qs = p.toString();
     return api.get<{ items: AssetItem[]; total: number }>(`/api/assets${qs ? `?${qs}` : ""}`);
   },
+};
+
+// Criminal Intelligence graph
+export const graphService = {
+  overview: () => api.get<GraphOverview>("/api/graph/overview"),
+  entities: (params: { entity_type?: string; q?: string; limit?: number } = {}) => {
+    const p = new URLSearchParams();
+    if (params.entity_type) p.set("entity_type", params.entity_type);
+    if (params.q) p.set("q", params.q);
+    if (params.limit) p.set("limit", String(params.limit));
+    const qs = p.toString();
+    return api.get<{ items: GraphNodeItem[] }>(`/api/graph/entities${qs ? `?${qs}` : ""}`);
+  },
+  relationships: (entityId: string, depth = 1) =>
+    api.get<GraphRelationships>(`/api/graph/relationships?entity_id=${entityId}&depth=${depth}`),
+  central: (limit = 20) => api.get<{ items: GraphNodeItem[] }>(`/api/graph/central?limit=${limit}`),
+  communities: (limit = 20) => api.get<{ items: GraphCommunity[] }>(`/api/graph/communities?limit=${limit}`),
+  connectivity: (a: string, b: string) =>
+    api.get<{ path: GraphNodeItem[]; hops: number }>(`/api/graph/connectivity?entity_a=${a}&entity_b=${b}`),
+  search: (q: string, limit = 20) => api.get<{ items: GraphNodeItem[] }>(`/api/graph/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 };

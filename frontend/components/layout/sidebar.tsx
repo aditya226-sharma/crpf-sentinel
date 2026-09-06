@@ -24,6 +24,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Gauge,
+  Fingerprint,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,9 +50,21 @@ interface NavItem {
 
 const navGroups: { title: string; items: NavItem[] }[] = [
   {
+    title: "Workspaces",
+    items: [
+      { href: "/", label: "Dashboard Select", icon: LayoutGrid },
+    ],
+  },
+  {
+    title: "Criminal Intelligence",
+    items: [
+      { href: "/criminal", label: "Network Map", icon: Fingerprint, permissions: ["graph.view"] },
+    ],
+  },
+  {
     title: "Command Center",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, permissions: ["dashboard.view"] },
+      { href: "/dashboard", label: "Log Intelligence Dashboard", icon: LayoutDashboard, permissions: ["dashboard.view"] },
       { href: "/live-events", label: "Live Events", icon: Radio, permissions: ["logs.view"] },
     ],
   },
@@ -100,7 +114,8 @@ const navGroups: { title: string; items: NavItem[] }[] = [
 ];
 
 const SECTION_LABELS: Record<string, string> = {
-  "/dashboard": "COMMAND CENTER",
+  "/criminal": "CRIMINAL INTELLIGENCE",
+  "/dashboard": "LOG INTELLIGENCE",
   "/live-events": "COMMAND CENTER",
   "/logs": "MONITORING",
   "/alerts": "MONITORING",

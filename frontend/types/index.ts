@@ -4,7 +4,7 @@ export interface User {
   email: string;
   full_name: string | null;
   role_id: string;
-  role: { id: string; name: string; permissions: string[] } | null;
+  role: { id: string; name: string; permissions: string[]; default_dashboard?: string | null } | null;
   unit_id: string | null;
   is_active: boolean;
   last_login_at: string | null;
@@ -304,6 +304,41 @@ export interface Role {
   name: string;
   description: string | null;
   permissions: string[];
+  default_dashboard?: string | null;
+}
+
+export interface GraphOverview {
+  backend: string;
+  nodes: number;
+  edges: number;
+  entity_types: Record<string, number>;
+}
+
+export interface GraphNodeItem {
+  id: string;
+  entity_type: string;
+  value: string;
+  name: string;
+  properties?: Record<string, unknown>;
+  degree?: number | null;
+}
+
+export interface GraphEdgeItem {
+  source: string;
+  target: string;
+  relation: string;
+  weight: number;
+}
+
+export interface GraphRelationships {
+  nodes: Record<string, GraphNodeItem>;
+  edges: GraphEdgeItem[];
+}
+
+export interface GraphCommunity {
+  id: string;
+  size: number;
+  entities: GraphNodeItem[];
 }
 
 export interface Incident {

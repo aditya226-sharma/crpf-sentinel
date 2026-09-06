@@ -32,6 +32,7 @@ PERMISSIONS = {
     "threat_intel.view",
     "threat_intel.manage",
     "correlations.view",
+    "graph.view",
 }
 
 ROLE_PERMISSIONS = {
@@ -57,6 +58,14 @@ ROLE_PERMISSIONS = {
         "agents.view",
         "units.view",
         "reports.view",
+    },
+    "crime_analyst": {
+        "dashboard.view",
+        "logs.view",
+        "alerts.view",
+        "units.view",
+        "threat_intel.view",
+        "graph.view",
     },
 }
 

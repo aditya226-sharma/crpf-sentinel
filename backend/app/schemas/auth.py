@@ -22,6 +22,7 @@ class RoleOut(BaseModel):
     name: str
     description: str | None = None
     permissions: list[str]
+    default_dashboard: str | None = None
 
     model_config = {"from_attributes": True}
 
