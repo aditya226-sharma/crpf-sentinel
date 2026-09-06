@@ -350,6 +350,49 @@ export interface QueryResult {
   narrative?: string;
 }
 
+export type ReportLanguage = "en" | "hi" | "hinglish";
+
+export interface CaseDocument {
+  id: string;
+  filename: string;
+  kind: string;
+  mime: string;
+  size: number;
+  available: boolean;
+  created_at: string | null;
+}
+
+export interface CaseIntakeItem {
+  id: string;
+  case_id: string;
+  title: string;
+  fir_number: string | null;
+  description: string | null;
+  status: string;
+  report_language: string;
+  created_at: string | null;
+  documents: CaseDocument[];
+  doc_counts?: Record<string, number>;
+}
+
+export interface ReportCdrRow {
+  number: string;
+  calls: number;
+  duration_s: number;
+}
+
+export interface CaseReport {
+  case: CaseIntakeItem;
+  lang: ReportLanguage;
+  language_label: string;
+  narrative: string;
+  stats: Record<string, number> & { by_kind: Record<string, number> } & { total: number };
+  intel: { phones: string[]; dates: string[]; amounts: string[] };
+  cdr: { rows: number; unique_numbers: number; total_duration_s: number; top: ReportCdrRow[] } | null;
+  photos: { filename: string; data_url: string | null; embedded: boolean }[];
+  html: string;
+}
+
 export interface Incident {
   id: string;
   incident_id: string;

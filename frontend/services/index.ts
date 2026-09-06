@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type {
   Agent,
   AgentEventItem,
@@ -34,6 +34,10 @@ import type {
   GraphOverview,
   GraphRelationships,
   QueryResult,
+  CaseDocument,
+  CaseIntakeItem,
+  CaseReport,
+  ReportLanguage,
 } from "@/types";
 
 // Auth
@@ -261,3 +265,64 @@ export const graphService = {
 export const queryService = {
   run: (query: string) => api.post<QueryResult>("/api/query", { query }),
 };
+
+// Crime case dossier → trilingual report + PDF
+export const caseIntakeService = {
+  create: (title: string, fir_number: string, description: string) => {
+    const form = new FormData();
+    form.set("title", title);
+    form.set("fir_number", fir_number);
+    form.set("description", description);
+    return api.raw("/api/case-intake", { method: "POST", body: form }).then((r) =>
+      handle<CaseIntakeItem>(r),
+    );
+  },
+  list: () =>
+    api.get<{ items: CaseIntakeItemWithCounts[] }>("/api/case-intake").then((r) => r.items),
+  detail: (caseId: string) => api.get<CaseIntakeItem>(`/api/case-intake/${encodeURIComponent(caseId)}`),
+  upload: (caseId: string, files: File[]) => {
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
+    return api.raw(`/api/case-intake/${encodeURIComponent(caseId)}/documents`, { method: "POST", body: form }).then((r) =>
+      handle<{ case_id: string; accepted: number; skipped: number; documents: CaseDocument[] }>(r),
+    );
+  },
+  report: (caseId: string, lang: ReportLanguage) =>
+    api.get<CaseReport>(`/api/case-intake/${encodeURIComponent(caseId)}/report?lang=${lang}`),
+  reportPdf: async (caseId: string, lang: ReportLanguage): Promise<Blob> => {
+    const res = await api.raw(`/api/case-intake/${encodeURIComponent(caseId)}/report.pdf?lang=${lang}`, {
+      method: "GET",
+    });
+    if (!res.ok) {
+      let message = `PDF request failed (${res.status})`;
+      try {
+        const body = await res.json();
+        message = body.error?.message ?? message;
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError("PDF_FAILED", message, res.status);
+    }
+    return res.blob();
+  },
+};
+
+async function handle<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let message = `Request failed (${response.status})`;
+    let code = "REQUEST_FAILED";
+    try {
+      const body = await response.json();
+      if (body.error) {
+        message = body.error.message ?? message;
+        code = body.error.code ?? code;
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(code, message, response.status);
+  }
+  return (await response.json()) as T;
+}
+
+export type CaseIntakeItemWithCounts = CaseIntakeItem;

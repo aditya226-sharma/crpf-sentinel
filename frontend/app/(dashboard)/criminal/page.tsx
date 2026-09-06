@@ -17,6 +17,7 @@ import { graphService, logService, queryService } from "@/services";
 import type { GraphNodeItem, GraphRelationships, QueryResult } from "@/types";
 import { cn } from "@/lib/utils";
 import { generateLocalNarrative, type LocalNarrativeEvent } from "@/lib/localNarrative";
+import { CaseDossier } from "@/components/criminal/case-dossier";
 
 const NODE_COLORS: Record<string, string> = {
   case: "#f59e0b",
@@ -689,6 +690,8 @@ export default function CriminalDashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      <CaseDossier />
     </div>
   );
 }
