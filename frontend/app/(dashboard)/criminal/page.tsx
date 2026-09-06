@@ -234,7 +234,9 @@ export default function CriminalDashboardPage() {
   }, []);
 
   const runQuery = useCallback(async () => {
-    if (!nlQuery.trim()) return;
+    const localBusy =
+      localNarr.stage === "downloading" || localNarr.stage === "loading" || localNarr.stage === "generating";
+    if (!nlQuery.trim() || nlBusy || localBusy) return;
     setNlBusy(true);
     setNlResult(null);
     setLocalNarr({ stage: "idle" });
@@ -242,6 +244,7 @@ export default function CriminalDashboardPage() {
     try {
       const res = await queryService.run(nlQuery);
       setNlResult(res);
+      if (!res.narrative) setLocalNarr({ stage: "idle" });
       if (localAi && !res.narrative && res.results.length > 0) {
         const narrative = await generateLocalNarrative(res, (event) => setLocalNarr(event));
         if (narrative) setLocalText(narrative);
@@ -251,7 +254,7 @@ export default function CriminalDashboardPage() {
     } finally {
       setNlBusy(false);
     }
-  }, [nlQuery, localAi]);
+  }, [nlQuery, localAi, nlBusy, localNarr.stage]);
 
   const runPath = useCallback(async () => {
     if (!pathA || !pathB) return;
@@ -282,6 +285,8 @@ export default function CriminalDashboardPage() {
 
   const entityTypeBadges = Object.entries(overview.data?.entity_types ?? {});
   const lastPathIds = useMemo(() => new Set((path ?? []).map((n) => n.id)), [path]);
+  const localBusy =
+    localNarr.stage === "downloading" || localNarr.stage === "loading" || localNarr.stage === "generating";
 
   return (
     <div className="space-y-5">
@@ -460,7 +465,7 @@ export default function CriminalDashboardPage() {
                     }}
                   />
                 </div>
-                <Button size="sm" disabled={!nlQuery.trim() || nlBusy} onClick={() => void runQuery()}>
+                <Button size="sm" disabled={!nlQuery.trim() || nlBusy || localBusy} onClick={() => void runQuery()}>
                   <Send className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -491,8 +496,8 @@ export default function CriminalDashboardPage() {
                   <span className="ml-auto text-[10px] text-muted">in-browser AI unavailable — template answer shown</span>
                 )}
               </div>
-              {nlBusy && <Skeleton className="h-16 w-full" />}
-              {!nlBusy && nlResult && (
+              {nlBusy && !nlResult && <Skeleton className="h-16 w-full" />}
+              {nlResult && (
                 <div className="rounded-md border border-border p-3">
                   <div className="mb-2 flex items-center gap-2">
                     <span className="text-[11px] font-semibold text-foreground">{nlResult.template}</span>

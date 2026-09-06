@@ -78,6 +78,9 @@ async function loadPipeline(
         },
       });
     })();
+    pipelinePromise.catch(() => {
+      pipelinePromise = null;
+    });
   }
   return pipelinePromise;
 }
@@ -125,7 +128,10 @@ export async function generateLocalNarrative(
     const raw = await racer;
     const narrative = extractGenerated(raw).trim();
 
-    if (!narrative) return null;
+    if (!narrative) {
+      push("idle", undefined);
+      return null;
+    }
 
     push("done", undefined);
     return narrative;
