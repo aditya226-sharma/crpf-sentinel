@@ -291,8 +291,9 @@ export interface DemoSimulateResult {
 
 export interface DemoResetResult {
   status: string;
-  removed_alerts: number;
-  removed_events: number;
+  removed_alerts?: number;
+  removed_events?: number;
+  message?: string;
 }
 
 export interface DashboardSummary {

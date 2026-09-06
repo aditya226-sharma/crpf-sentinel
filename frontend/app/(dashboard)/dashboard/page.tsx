@@ -13,6 +13,7 @@ import { ActiveThreats } from "@/components/dashboard/active-threats";
 import { LiveEventStream } from "@/components/dashboard/live-event-stream";
 import { UnitSecurityMap } from "@/components/dashboard/unit-security-map";
 import { SimulateAttackButton } from "@/components/dashboard/simulate-attack-button";
+import { ResetDemoButton } from "@/components/dashboard/reset-demo-button";
 import { ExecutiveRiskGauge } from "@/components/dashboard/executive-risk-gauge";
 import { AgentConnectionStatus } from "@/components/dashboard/agent-connection-status";
 import { ImpactMetricCard } from "@/components/dashboard/impact-metric-card";
@@ -129,6 +130,7 @@ export default function DashboardPage() {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SimulateAttackButton />
+            <ResetDemoButton onResetComplete={refetch} />
             <Badge variant="success" className="gap-1.5 text-[10px]">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
