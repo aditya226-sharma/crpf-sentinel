@@ -321,27 +321,41 @@ def seed_hero_incidents(db: Session) -> int:
     return seed_demo_incidents(db)
 
 
-def reset_demo(db: Session) -> dict:
-    """Restore the curated demo state: remove simulated artifacts and reseed.
+def _delete_in_batches(db: Session, model, column, value_query, batch: int = 2000) -> int:
+    """Delete rows matching ``column IN (value_query)`` in small committed batches.
 
-    Uses set-based DELETEs with subqueries (no giant IN-lists) so it stays
-    fast and lock-light even when the sim dataset has grown large, and commits
-    in small batches to avoid long transactions that contend with the live
-    dashboard.
+    A single giant DELETE on hosted Postgres holds row locks long enough to
+    block against the live dashboard's continuous reads; deleting in bounded,
+    immediately-committed batches keeps each transaction tiny and lock-light.
+    Returns the number of rows removed (best-effort count).
     """
+    removed = 0
+    while True:
+        ids = [
+            r[0] for r in db.query(model.id)
+            .filter(column.in_(value_query)).limit(batch).all()
+        ]
+        if not ids:
+            break
+        db.query(model).filter(model.id.in_(ids)).delete(synchronize_session=False)
+        db.commit()
+        removed += len(ids)
+    return removed
+
+
+def reset_demo(db: Session) -> dict:
+    """Restore the curated demo state: remove simulated artifacts and reseed."""
     sim_agents = db.query(Agent).filter(Agent.agent_id.like(f"{SIM_AGENT_PREFIX}%")).all()
     sim_agent_ids = [a.id for a in sim_agents]
     removed_alerts = removed_events = 0
 
     if sim_agent_ids:
-        # 1) Count what we will remove (for the report) via subqueries.
         removed_alerts = (
-            db.query(func.count(Alert.id))
-            .filter(Alert.agent_id.in_(sim_agent_ids)).scalar() or 0
+            db.query(func.count(Alert.id)).filter(Alert.agent_id.in_(sim_agent_ids)).scalar() or 0
         )
         ne_log_ids = db.query(Log.id).filter(Log.agent_id.in_(sim_agent_ids)).subquery()
 
-        # 2) Children of the sim alerts, then the alerts themselves.
+        # Children of the sim alerts.
         db.query(AlertEvent).filter(
             AlertEvent.alert_id.in_(db.query(Alert.id).filter(Alert.agent_id.in_(sim_agent_ids)))
         ).delete(synchronize_session=False)
@@ -356,20 +370,19 @@ def reset_demo(db: Session) -> dict:
         db.query(Alert).filter(Alert.agent_id.in_(sim_agent_ids)).delete(synchronize_session=False)
         db.commit()
 
-        # 3) Break the log<->event FK cycle, then delete events then logs in batches.
-        removed_events = (
-            db.query(func.count(NormalizedEvent.id)).filter(NormalizedEvent.log_id.in_(ne_log_ids)).scalar() or 0
-        )
+        # Break the log<->event FK cycle once (fast), then delete in batches.
         db.query(Log).filter(Log.normalized_event_id.in_(
             db.query(NormalizedEvent.id).filter(NormalizedEvent.log_id.in_(ne_log_ids))
         )).update({"normalized_event_id": None}, synchronize_session=False)
-        db.query(NormalizedEvent).filter(
-            NormalizedEvent.log_id.in_(ne_log_ids)
-        ).delete(synchronize_session=False)
-        db.query(Log).filter(Log.agent_id.in_(sim_agent_ids)).delete(synchronize_session=False)
         db.commit()
 
-        # 4) Drop incidents that were purely created from simulated alerts.
+        removed_events = (
+            db.query(func.count(NormalizedEvent.id)).filter(NormalizedEvent.log_id.in_(ne_log_ids)).scalar() or 0
+        )
+        _delete_in_batches(db, NormalizedEvent, NormalizedEvent.log_id, ne_log_ids, batch=1500)
+        _delete_in_batches(db, Log, Log.agent_id, sim_agent_ids, batch=1500)
+
+        # Drop incidents that were purely created from simulated alerts.
         linked_incident_ids = db.query(IncidentAlert.incident_id).distinct().subquery()
         orphan_incident_ids = [
             iid for (iid,) in db.query(Incident.id)
