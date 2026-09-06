@@ -1,0 +1,10 @@
+.git
+backend
+docs
+opencode
+.opencode
+README.md
+**/node_modules
+**/.next
+**/.vercel
+**/.env*
