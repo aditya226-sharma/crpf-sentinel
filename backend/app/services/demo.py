@@ -332,13 +332,12 @@ def _raw_delete_batches(db: Session, sql: str, params: dict, batch: int = 2000) 
             break
 
 
-def reset_demo(db: Session) -> dict:
-    """Restore the curated demo state using server-side-only raw SQL.
+def _purge_sim_data(db: Session) -> tuple[int, int]:
+    """Delete simulated artifacts with raw server-side SQL (SQLite/test path).
 
-    The previous ORM-based approach loaded every matching row into the session
-    identity map, exhausting memory on the Render free-tier.  Raw SQL keeps
-    everything server-side — zero per-row Python objects — so even 70k+ rows
-    are deleted in fast committed batches without memory pressure.
+    Postgres uses a single TRUNCATE (see reset_demo) which is milliseconds and
+    zero per-row work.  This DELETE fallback keeps the same semantics for tests
+    that run on SQLite (which has no TRUNCATE).
     """
     rows = db.execute(
         text("SELECT id FROM agents WHERE agent_id LIKE :prefix"),
@@ -347,18 +346,14 @@ def reset_demo(db: Session) -> dict:
     sim_agent_ids = [r[0] for r in rows]
     removed_alerts = removed_events = 0
 
-    logger.info("reset_demo: found %d sim agents", len(sim_agent_ids))
-
     if sim_agent_ids:
         ph = ", ".join(f":a{i}" for i in range(len(sim_agent_ids)))
         p = {f"a{i}": aid for i, aid in enumerate(sim_agent_ids)}
 
         removed_alerts = db.execute(text(f"SELECT count(*) FROM alerts WHERE agent_id IN ({ph})"), p).scalar() or 0
-        logger.info("reset_demo: removing %d sim alerts", removed_alerts)
 
         db.execute(text(f"DELETE FROM alert_events WHERE alert_id IN (SELECT id FROM alerts WHERE agent_id IN ({ph}))"), p)
         db.commit()
-        logger.info("reset_demo: alert_events(alert_id) done")
 
         db.execute(text(f"""
             DELETE FROM alert_events WHERE normalized_event_id IN (
@@ -367,21 +362,17 @@ def reset_demo(db: Session) -> dict:
             )
         """), p)
         db.commit()
-        logger.info("reset_demo: alert_events(normalized_event_id) done")
 
         db.execute(text(f"DELETE FROM incident_alerts WHERE alert_id IN (SELECT id FROM alerts WHERE agent_id IN ({ph}))"), p)
         db.commit()
-        logger.info("reset_demo: incident_alerts(alert_id) done")
 
         db.execute(text(f"UPDATE logs SET normalized_event_id = NULL WHERE agent_id IN ({ph})"), p)
         db.commit()
-        logger.info("reset_demo: FK cycle broken")
 
         removed_events = db.execute(text(f"""
             SELECT count(*) FROM normalized_events ne
             JOIN logs l ON ne.log_id = l.id WHERE l.agent_id IN ({ph})
         """), p).scalar() or 0
-        logger.info("reset_demo: removing %d sim normalized_events", removed_events)
 
         _raw_delete_batches(db, f"""
             DELETE FROM normalized_events WHERE id IN (
@@ -390,7 +381,6 @@ def reset_demo(db: Session) -> dict:
                 LIMIT :lim
             )
         """, {**p, "lim": 2000})
-        logger.info("reset_demo: normalized_events purged")
 
         _raw_delete_batches(db, f"""
             DELETE FROM logs WHERE id IN (
@@ -398,7 +388,6 @@ def reset_demo(db: Session) -> dict:
                 WHERE l.agent_id IN ({ph}) LIMIT :lim
             )
         """, {**p, "lim": 2000})
-        logger.info("reset_demo: logs purged")
 
         db.execute(text("""
             DELETE FROM incident_notes WHERE incident_id IN (
@@ -409,6 +398,7 @@ def reset_demo(db: Session) -> dict:
         db.execute(text("""
             DELETE FROM incident_alerts WHERE incident_id IN (
                 SELECT id FROM incidents WHERE source = 'correlation'
+                AND id NOT IN (SELECT DISTINCT incident_id FROM incident_alerts)
             )
         """))
         db.execute(text("""
@@ -417,6 +407,27 @@ def reset_demo(db: Session) -> dict:
         """))
         db.commit()
 
+    return removed_alerts, removed_events
+
+
+def reset_demo(db: Session) -> dict:
+    """Restore the pristine curated demo state.
+
+    On Postgres: a single TRUNCATE ... RESTART IDENTITY CASCADE clears the
+    event/log/alert/incident tables in milliseconds — every artifact on this
+    demo platform is synthetic, so wholesale reset is exactly right and avoids
+    the OOM/lock trouble of row-deleting 70k+ orphaned events.  On SQLite
+    (tests), falls back to row deletes since SQLite has no TRUNCATE.
+    """
+    if db.get_bind().dialect.name == "postgresql":
+        removed_events = db.execute(text("SELECT count(*) FROM normalized_events")).scalar() or 0
+        removed_alerts = db.execute(text("SELECT count(*) FROM alerts")).scalar() or 0
+        db.execute(text("TRUNCATE TABLE logs, alerts, incidents RESTART IDENTITY CASCADE"))
+        db.commit()
+    else:
+        removed_alerts, removed_events = _purge_sim_data(db)
+
     seed_demo_log_data(db)
     seed_hero_incidents(db)
+    db.commit()
     return {"removed_alerts": removed_alerts, "removed_events": removed_events}
