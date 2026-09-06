@@ -1,10 +1,12 @@
 """Ingestion pipeline: raw event → parse → normalize → store → detect."""
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.detection.analyzers import run_analysis_detectors
 from app.detection.engine import run_detection_engine
 from app.detection.ioc import run_ioc_check
 from app.models.agent import Agent
@@ -13,7 +15,6 @@ from app.models.log import Log
 from app.models.unit import Unit
 from app.normalization.engine import normalize_event
 from app.parsers import ParserRegistry
-from app.parsers.windows import WindowsEventParser
 from app.websocket.stream import publish
 
 
@@ -29,7 +30,7 @@ def ingest_payload(
     try:
         parser = ParserRegistry.get(parser_format)
     except ValueError:
-        parser = WindowsEventParser()
+        parser = ParserRegistry.get("windows")
 
     parsed = parser.parse(payload)
     if parsed is None:
@@ -41,11 +42,14 @@ def ingest_payload(
         unit_id=unit_id,
         agent_id=agent.id,
         parser_version=parser.version,
+        format_name=parser.format_name,
     )
     if normalized is None:
         return {"accepted": 1, "parsed": 0, "error": "missing_event_id"}
 
-    raw_log = parsed.raw or (payload if isinstance(payload, str) else "")
+    raw_log = parsed.raw if isinstance(parsed.raw, str) else json.dumps(parsed.raw or payload, default=str)
+    if not isinstance(raw_log, str):
+        raw_log = json.dumps(payload, default=str)
 
     log_row = Log(
         unit_id=unit_id,
@@ -89,6 +93,16 @@ def ingest_payload(
     ioc_alerts = run_ioc_check(db, normalized, event_row_id=event_row.id)
     if ioc_alerts:
         alerts = alerts + ioc_alerts
+    analysis_alerts, analysis_ids = run_analysis_detectors(db, normalized, event_row.id)
+    if analysis_alerts:
+        alerts = alerts + analysis_alerts
+        matched_ids = matched_ids + analysis_ids
+
+    if normalized.get("format_name") == "case_record":
+        from app.graph.indexer import index_case_record
+
+        index_case_record(db, normalized, event_row.id)
+
     if matched_ids or ioc_alerts:
         event_row.is_suspicious = True
         event_row.matched_rule_id = matched_ids[0] if matched_ids else None

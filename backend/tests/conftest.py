@@ -22,16 +22,38 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module", autouse=True)
+def _pristine_db() -> None:
+    """Reset schema + reseed for every test module.
+
+    Module scope gives each module a pristine database, so modules can assert
+    on absolute totals without cross-module pollution.
+    """
+    from app.database.base import Base
+    from app.database.session import engine
+
+    with engine.connect() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
+    from app.seed.seed_all import seed_all
+
+    seed_all()
+
+
+@pytest.fixture(scope="module")
 def client() -> TestClient:
-    """App with seeded roles/admin/rules/units on the isolated SQLite DB."""
+    """App against the pristine, seeded SQLite database."""
     from app.main import app
 
     with TestClient(app) as c:
         yield c
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def admin_headers(client: TestClient) -> dict[str, str]:
     resp = client.post(
         "/api/auth/login",

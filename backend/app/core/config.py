@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./sentinel.db"
 
+    # Criminal Intelligence graph backing store. "relational" is the default
+    # (zero-dependency, SQLAlchemy tables). "neo4j" uses the optional driver.
+    GRAPH_BACKEND: str = "relational"
+    NEO4J_URI: str = ""
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = ""
+
     # CORS
     BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 

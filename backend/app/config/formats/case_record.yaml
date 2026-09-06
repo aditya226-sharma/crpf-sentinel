@@ -1,0 +1,18 @@
+defaults:
+  category: case
+  action: record_observed
+  severity: informational
+
+codes:
+  "5001":
+    category: case
+    action: record_created
+    severity: informational
+  "5002":
+    category: case
+    action: financial_transaction
+    severity: low
+  "5003":
+    category: case
+    action: communication_record
+    severity: low

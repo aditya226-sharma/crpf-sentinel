@@ -1,0 +1,18 @@
+defaults:
+  category: network
+  action: flow_observed
+  severity: informational
+
+codes:
+  "3001":
+    category: network
+    action: flow_observed
+    severity: informational
+  "3002":
+    category: network
+    action: flow_burst
+    severity: high
+  "3003":
+    category: network
+    action: flow_anomaly
+    severity: medium

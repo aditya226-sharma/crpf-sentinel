@@ -10,6 +10,7 @@ from app.api.routes import (
     audit,
     auth,
     dashboard,
+    graph,
     health,
     incidents,
     ioc,
@@ -41,6 +42,7 @@ api_router.include_router(assets.router)
 api_router.include_router(search.router)
 api_router.include_router(agents.router)
 api_router.include_router(units.router)
+api_router.include_router(graph.router)
 api_router.include_router(users.router)
 api_router.include_router(audit.router)
 api_router.include_router(reports.router)

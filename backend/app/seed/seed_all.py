@@ -31,8 +31,13 @@ def seed_all() -> dict:
         admin = db.query(User).filter(User.username == settings.SEED_ADMIN_USERNAME).first()
         rules_seeded = seed_rules(db, created_by=admin)
         units = seed_units(db)
+        case_records = 0
+        if settings.SEED_DEMO_DATA:
+            from app.seed.case_records import seed_case_records
+
+            case_records = seed_case_records(db)
         db.commit()
-        return {"rules": rules_seeded, "units": len(units)}
+        return {"rules": rules_seeded, "units": len(units), "case_records": case_records}
     finally:
         db.close()
 

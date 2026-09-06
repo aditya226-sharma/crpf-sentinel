@@ -17,7 +17,7 @@ from app.models.event import NormalizedEvent
 from app.models.log import Log
 from app.models.unit import Unit
 from app.models.user import User
-from app.normalization.engine import EVENT_CLASSIFICATION
+from app.config.format_config import classify
 from app.services.ingest import ingest_payload
 
 UNITS = [
@@ -168,7 +168,7 @@ def _bulk_normal_event(
 ):
     now = datetime.now(timezone.utc)
     when = min(when, now)
-    category, action, severity = EVENT_CLASSIFICATION.get(event_id, ("unknown", "observed", "informational"))
+    category, action, severity = classify("windows", event_id)
     payload = _structured_payload(
         event_id, agent.hostname, when,
         data={

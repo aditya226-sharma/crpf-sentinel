@@ -1,29 +1,24 @@
 """Normalization engine: converts parser output into the common event schema.
 
-Modular: an event gets a category/action/severity from the mapping tables
-below. Additional log sources are added by extending these maps and the
-parser registry — no changes to the ingestion pipeline are required.
+The engine dispatches by ``format_name``:
+
+1. Pull the format-specific ``extract_fields`` implementation via a registry
+   (one per registered parser — a Syslog event and a Windows event normalize
+   through the same function),
+2. classify through the per-format YAML catalog (``app/config/formats/*.yaml``),
+3. emit one common dict that feeds the relational store, the detection engine,
+   risk scoring and the live stream.
+
+Adding a new source = add its YAML + parser; the engine itself never changes.
 """
 
 import ipaddress
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
+from app.config.format_config import classify
+from app.normalization.extractors import EXTRACTORS
 from app.parsers.base import ParsedEvent
-from app.parsers.windows import WindowsEventParser
-
-EVENT_CLASSIFICATION: dict[int, tuple[str, str, str]] = {
-    4624: ("authentication", "login_success", "low"),
-    4625: ("authentication", "login_failed", "medium"),
-    4648: ("credential_usage", "explicit_credential_use", "medium"),
-    4672: ("privilege_assignment", "special_privileges_assigned", "medium"),
-    4688: ("process_creation", "process_created", "low"),
-    4720: ("account_management", "user_created", "high"),
-    4728: ("account_management", "member_added_privileged_group", "high"),
-    4732: ("account_management", "member_added_privileged_group", "high"),
-    1102: ("security_audit", "audit_log_cleared", "critical"),
-    7045: ("service_installation", "service_installed", "high"),
-}
 
 PRIVILEGED_USERS = {
     "administrator",
@@ -87,32 +82,74 @@ def normalize_event(
     unit_id: str | None,
     agent_id: str | None,
     parser_version: str = "1.0",
+    format_name: str = "windows",
 ) -> dict[str, Any] | None:
     if parsed.event_id is None:
         return None
 
-    fields = WindowsEventParser.extract_fields(parsed)
-    category, action, default_severity = EVENT_CLASSIFICATION.get(
-        parsed.event_id, ("unknown", "observed", "informational")
+    extract: Callable[[ParsedEvent], dict] = EXTRACTORS.get(
+        format_name, EXTRACTORS["windows"]
     )
+    fields = extract(parsed)
+    category, action, severity = classify(format_name, parsed.event_id)
 
-    username = _clean_username(fields["username"])
-    source_ip = _clean_ip(fields["source_ip"])
-    destination_ip = _clean_ip(fields["destination_ip"])
-    timestamp = parse_timestamp(fields["timestamp"])
+    username = _clean_username(fields.get("username"))
+    source_ip = _clean_ip(fields.get("source_ip"))
+    destination_ip = _clean_ip(fields.get("destination_ip"))
+    timestamp = parse_timestamp(fields.get("timestamp"))
 
-    severity = default_severity
-    if parsed.event_id == 4672:
-        privileged = username and username.lower() in PRIVILEGED_USERS
-        severity = "high" if privileged else "medium"
-    if parsed.event_id == 4688:
-        severity = _process_creation_severity(fields["command_line"])
+    if format_name == "windows":
+        severity = _windows_severity_override(parsed.event_id, fields, severity)
 
-    event = {
+    extra: dict[str, Any] = {
+        "format": format_name,
+        "protocol": fields.get("protocol"),
+        "source_port": fields.get("source_port"),
+        "destination_port": fields.get("destination_port"),
+    }
+
+    if format_name == "netflow":
+        extra.update(
+            {
+                "packets": fields.get("packets"),
+                "bytes": fields.get("bytes"),
+            }
+        )
+    if format_name == "ipsec":
+        extra.update(
+            {
+                "tunnel_name": fields.get("tunnel_name"),
+                "dh_group": fields.get("dh_group"),
+                "pfs": fields.get("pfs"),
+                "cipher": fields.get("cipher"),
+                "integrity": fields.get("integrity"),
+            }
+        )
+    if format_name == "syslog":
+        extra.update(
+            {
+                "message": fields.get("message"),
+                "cef_severity": fields.get("cef_severity"),
+            }
+        )
+    if format_name == "case_record":
+        extra.update(
+            {
+                "case_id": fields.get("case_id"),
+                "record_type": fields.get("record_type"),
+                "persons": fields.get("persons") or [],
+                "phones": fields.get("phones") or [],
+                "addresses": fields.get("addresses") or [],
+                "vehicles": fields.get("vehicles") or [],
+                "accounts": fields.get("accounts") or [],
+            }
+        )
+
+    return {
         "timestamp": timestamp or datetime.now(timezone.utc),
         "unit_id": unit_id,
         "agent_id": agent_id,
-        "hostname": fields["hostname"] or None,
+        "hostname": fields.get("hostname") or None,
         "event_id": parsed.event_id,
         "provider": parsed.provider or None,
         "category": category,
@@ -120,23 +157,27 @@ def normalize_event(
         "username": username,
         "source_ip": source_ip,
         "destination_ip": destination_ip,
-        "process_name": fields["process_name"] or None,
-        "command_line": fields["command_line"] or None,
-        "logon_type": fields["logon_type"] or None,
-        "status_code": fields["status_code"] or None,
+        "process_name": fields.get("process_name") or None,
+        "command_line": fields.get("command_line") or None,
+        "logon_type": fields.get("logon_type") or None,
+        "status_code": fields.get("status_code") or None,
         "severity": severity,
         "parser_version": parser_version,
+        "format_name": format_name,
         "is_suspicious": False,
-        "extra": {
-            "account_domain": fields["account_domain"],
-            "service_name": fields["service_name"],
-            "image_path": fields["image_path"],
-            "member_name": fields["member_name"],
-            "privileges": fields["privileges"],
-            "user_sid": fields["user_sid"],
-        },
+        "extra": extra,
     }
-    return event
+
+
+def _windows_severity_override(event_id: int, fields: dict, default: str) -> str:
+    """Windows-specific severity refinements that depend on event content."""
+    if event_id in (4672,):
+        username = _clean_username(fields.get("username"))
+        privileged = username and username.lower() in PRIVILEGED_USERS
+        return "high" if privileged else "medium"
+    if event_id == 4688:
+        return _process_creation_severity(fields.get("command_line"))
+    return default
 
 
 def _process_creation_severity(command_line: str | None) -> str:

@@ -1,0 +1,18 @@
+defaults:
+  category: vpn
+  action: tunnel_observed
+  severity: informational
+
+codes:
+  "4001":
+    category: vpn
+    action: tunnel_established
+    severity: low
+  "4002":
+    category: vpn
+    action: tunnel_misconfigured
+    severity: high
+  "4003":
+    category: vpn
+    action: tunnel_negotiation_failed
+    severity: medium

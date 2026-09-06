@@ -21,6 +21,8 @@ def compute_risk_score(
     source_ip: str | None = None,
     event_id: int | None = None,
     correlated_success: bool = False,
+    traffic_anomaly_score: int = 0,
+    vpn_misconfig_score: int = 0,
 ) -> tuple[int, list[dict]]:
     reasons: list[dict] = []
 
@@ -59,6 +61,13 @@ def compute_risk_score(
         points = 12
         score += points
         reasons.append({"label": "correlated successful login", "points": points})
+
+    if traffic_anomaly_score:
+        score += traffic_anomaly_score
+        reasons.append({"label": "traffic anomaly detected", "points": traffic_anomaly_score})
+    if vpn_misconfig_score:
+        score += vpn_misconfig_score
+        reasons.append({"label": "VPN misconfiguration", "points": vpn_misconfig_score})
 
     score = max(0, min(100, score))
     return score, reasons

@@ -1,0 +1,46 @@
+defaults:
+  category: security
+  action: observed
+  severity: informational
+
+codes:
+  "4624":
+    category: authentication
+    action: login_success
+    severity: low
+  "4625":
+    category: authentication
+    action: login_failed
+    severity: medium
+  "4648":
+    category: credential_usage
+    action: explicit_credential_use
+    severity: medium
+  "4672":
+    category: privilege_assignment
+    action: special_privileges_assigned
+    severity: medium
+  "4688":
+    category: process_creation
+    action: process_created
+    severity: low
+  "4720":
+    category: account_management
+    action: user_created
+    severity: high
+  "4728":
+    category: account_management
+    action: member_added_privileged_group
+    severity: high
+  "4732":
+    category: account_management
+    action: member_added_privileged_group
+    severity: high
+  "1102":
+    category: security_audit
+    action: audit_log_cleared
+    severity: critical
+  "7045":
+    category: service_installation
+    action: service_installed
+    severity: high

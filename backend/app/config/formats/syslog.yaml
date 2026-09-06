@@ -1,0 +1,26 @@
+defaults:
+  category: security
+  action: syslog_observed
+  severity: informational
+
+codes:
+  "4210":
+    category: authentication
+    action: syslog_login_failed
+    severity: medium
+  "4211":
+    category: authentication
+    action: syslog_login_success
+    severity: low
+  "4550":
+    category: security
+    action: syslog_generic
+    severity: informational
+  "4551":
+    category: security
+    action: syslog_firewall_denied
+    severity: medium
+  "4552":
+    category: security
+    action: syslog_firewall_allowed
+    severity: informational

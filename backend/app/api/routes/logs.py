@@ -226,7 +226,13 @@ def ingest(
 
     for item in body.events:
         payload = item.raw_xml or item.raw_json or item.model_dump(exclude_none=True)
-        result = ingest_payload(db, payload, agent=agent, unit=unit)
+        result = ingest_payload(
+            db,
+            payload,
+            agent=agent,
+            unit=unit,
+            parser_format=item.source,
+        )
         accepted += result.get("accepted", 0)
         parsed += result.get("parsed", 0)
         alerts_triggered += result.get("alerts_triggered", 0)
