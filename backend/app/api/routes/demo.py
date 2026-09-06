@@ -58,6 +58,7 @@ def _run_reset_worker(username: str, user_id: str, ip: str) -> None:
     try:
         db = SessionLocal()
         try:
+            logger.info("demo_reset worker starting (%s)", username)
             result = demo.reset_demo(db)
             record_audit(
                 db, "demo_reset", "demo",

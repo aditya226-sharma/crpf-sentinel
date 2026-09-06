@@ -12,12 +12,12 @@ scoring), so a judge asking "is this actually running?" always gets an honest
 
 import json
 import random
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
-
 from app.core.security import generate_agent_token
 from app.models.agent import Agent
 from app.models.alert import Alert, AlertEvent
@@ -30,6 +30,8 @@ from app.models.user import User
 from app.normalization.engine import normalize_event
 from app.parsers import ParserRegistry
 from app.services.ingest import ingest_payload
+
+logger = logging.getLogger("cyberrakshak.demo")
 
 SIM_AGENT_PREFIX = "SIM-"
 
@@ -321,87 +323,100 @@ def seed_hero_incidents(db: Session) -> int:
     return seed_demo_incidents(db)
 
 
-def _delete_in_batches(db: Session, model, column, value_query, batch: int = 2000) -> int:
-    """Delete rows matching ``column IN (value_query)`` in small committed batches.
-
-    A single giant DELETE on hosted Postgres holds row locks long enough to
-    block against the live dashboard's continuous reads; deleting in bounded,
-    immediately-committed batches keeps each transaction tiny and lock-light.
-    Returns the number of rows removed (best-effort count).
-    """
-    removed = 0
+def _raw_delete_batches(db: Session, sql: str, params: dict, batch: int = 2000) -> None:
+    """Execute a raw SQL DELETE with LIMIT in a loop until nothing remains."""
     while True:
-        ids = [
-            r[0] for r in db.query(model.id)
-            .filter(column.in_(value_query)).limit(batch).all()
-        ]
-        if not ids:
-            break
-        db.query(model).filter(model.id.in_(ids)).delete(synchronize_session=False)
+        r = db.execute(text(sql), params)
         db.commit()
-        removed += len(ids)
-    return removed
+        if r.rowcount == 0:
+            break
 
 
 def reset_demo(db: Session) -> dict:
-    """Restore the curated demo state: remove simulated artifacts and reseed."""
-    sim_agents = db.query(Agent).filter(Agent.agent_id.like(f"{SIM_AGENT_PREFIX}%")).all()
-    sim_agent_ids = [a.id for a in sim_agents]
+    """Restore the curated demo state using server-side-only raw SQL.
+
+    The previous ORM-based approach loaded every matching row into the session
+    identity map, exhausting memory on the Render free-tier.  Raw SQL keeps
+    everything server-side — zero per-row Python objects — so even 70k+ rows
+    are deleted in fast committed batches without memory pressure.
+    """
+    rows = db.execute(
+        text("SELECT id FROM agents WHERE agent_id LIKE :prefix"),
+        {"prefix": f"{SIM_AGENT_PREFIX}%"},
+    ).all()
+    sim_agent_ids = [r[0] for r in rows]
     removed_alerts = removed_events = 0
 
+    logger.info("reset_demo: found %d sim agents", len(sim_agent_ids))
+
     if sim_agent_ids:
-        removed_alerts = (
-            db.query(func.count(Alert.id)).filter(Alert.agent_id.in_(sim_agent_ids)).scalar() or 0
-        )
-        ne_log_ids = db.query(Log.id).filter(Log.agent_id.in_(sim_agent_ids)).subquery()
+        ph = ", ".join(f":a{i}" for i in range(len(sim_agent_ids)))
+        p = {f"a{i}": aid for i, aid in enumerate(sim_agent_ids)}
 
-        # Children of the sim alerts.
-        db.query(AlertEvent).filter(
-            AlertEvent.alert_id.in_(db.query(Alert.id).filter(Alert.agent_id.in_(sim_agent_ids)))
-        ).delete(synchronize_session=False)
-        db.query(IncidentAlert).filter(
-            IncidentAlert.alert_id.in_(db.query(Alert.id).filter(Alert.agent_id.in_(sim_agent_ids)))
-        ).delete(synchronize_session=False)
-        db.query(AlertEvent).filter(
-            AlertEvent.normalized_event_id.in_(
-                db.query(NormalizedEvent.id).filter(NormalizedEvent.log_id.in_(ne_log_ids))
+        removed_alerts = db.execute(text(f"SELECT count(*) FROM alerts WHERE agent_id IN ({ph})"), p).scalar() or 0
+        logger.info("reset_demo: removing %d sim alerts", removed_alerts)
+
+        db.execute(text(f"DELETE FROM alert_events WHERE alert_id IN (SELECT id FROM alerts WHERE agent_id IN ({ph}))"), p)
+        db.commit()
+        logger.info("reset_demo: alert_events(alert_id) done")
+
+        db.execute(text(f"""
+            DELETE FROM alert_events WHERE normalized_event_id IN (
+                SELECT ne.id FROM normalized_events ne
+                JOIN logs l ON ne.log_id = l.id WHERE l.agent_id IN ({ph})
             )
-        ).delete(synchronize_session=False)
-        db.query(Alert).filter(Alert.agent_id.in_(sim_agent_ids)).delete(synchronize_session=False)
+        """), p)
+        db.commit()
+        logger.info("reset_demo: alert_events(normalized_event_id) done")
+
+        db.execute(text(f"DELETE FROM incident_alerts WHERE alert_id IN (SELECT id FROM alerts WHERE agent_id IN ({ph}))"), p)
+        db.commit()
+        logger.info("reset_demo: incident_alerts(alert_id) done")
+
+        db.execute(text(f"UPDATE logs SET normalized_event_id = NULL WHERE agent_id IN ({ph})"), p)
+        db.commit()
+        logger.info("reset_demo: FK cycle broken")
+
+        removed_events = db.execute(text(f"""
+            SELECT count(*) FROM normalized_events ne
+            JOIN logs l ON ne.log_id = l.id WHERE l.agent_id IN ({ph})
+        """), p).scalar() or 0
+        logger.info("reset_demo: removing %d sim normalized_events", removed_events)
+
+        _raw_delete_batches(db, f"""
+            DELETE FROM normalized_events WHERE id IN (
+                SELECT ne.id FROM normalized_events ne
+                JOIN logs l ON ne.log_id = l.id WHERE l.agent_id IN ({ph})
+                LIMIT :lim
+            )
+        """, {**p, "lim": 2000})
+        logger.info("reset_demo: normalized_events purged")
+
+        _raw_delete_batches(db, f"""
+            DELETE FROM logs WHERE id IN (
+                SELECT l.id FROM logs l
+                WHERE l.agent_id IN ({ph}) LIMIT :lim
+            )
+        """, {**p, "lim": 2000})
+        logger.info("reset_demo: logs purged")
+
+        db.execute(text("""
+            DELETE FROM incident_notes WHERE incident_id IN (
+                SELECT id FROM incidents WHERE source = 'correlation'
+                AND id NOT IN (SELECT DISTINCT incident_id FROM incident_alerts)
+            )
+        """))
+        db.execute(text("""
+            DELETE FROM incident_alerts WHERE incident_id IN (
+                SELECT id FROM incidents WHERE source = 'correlation'
+            )
+        """))
+        db.execute(text("""
+            DELETE FROM incidents WHERE source = 'correlation'
+            AND id NOT IN (SELECT DISTINCT incident_id FROM incident_alerts)
+        """))
         db.commit()
 
-        # Break the log<->event FK cycle once (fast), then delete in batches.
-        db.query(Log).filter(Log.normalized_event_id.in_(
-            db.query(NormalizedEvent.id).filter(NormalizedEvent.log_id.in_(ne_log_ids))
-        )).update({"normalized_event_id": None}, synchronize_session=False)
-        db.commit()
-
-        removed_events = (
-            db.query(func.count(NormalizedEvent.id)).filter(NormalizedEvent.log_id.in_(ne_log_ids)).scalar() or 0
-        )
-        _delete_in_batches(db, NormalizedEvent, NormalizedEvent.log_id, ne_log_ids, batch=1500)
-        _delete_in_batches(db, Log, Log.agent_id, sim_agent_ids, batch=1500)
-
-        # Drop incidents that were purely created from simulated alerts.
-        linked_incident_ids = db.query(IncidentAlert.incident_id).distinct().subquery()
-        orphan_incident_ids = [
-            iid for (iid,) in db.query(Incident.id)
-            .filter(Incident.source == "correlation", Incident.id.notin_(linked_incident_ids))
-            .all()
-        ]
-        if orphan_incident_ids:
-            db.query(IncidentAlert).filter(
-                IncidentAlert.incident_id.in_(orphan_incident_ids)
-            ).delete(synchronize_session=False)
-            db.query(IncidentNote).filter(
-                IncidentNote.incident_id.in_(orphan_incident_ids)
-            ).delete(synchronize_session=False)
-            db.query(Incident).filter(
-                Incident.id.in_(orphan_incident_ids)
-            ).delete(synchronize_session=False)
-        db.commit()
-
-    # Recreate the curated backdrop.
     seed_demo_log_data(db)
     seed_hero_incidents(db)
     return {"removed_alerts": removed_alerts, "removed_events": removed_events}
