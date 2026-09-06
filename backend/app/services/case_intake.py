@@ -156,6 +156,10 @@ def _t(lang: str, key: str) -> str:
     return _PHRASES.get(lang, _PHRASES["en"]).get(key, _PHRASES["en"].get(key, key))
 
 
+def _plural(n: int, single: str, plural: str | None = None) -> str:
+    return f"{n} {single if n == 1 else (plural or single + 's')}"
+
+
 def _narrative(lang: str, stats: dict, top_caller: str | None) -> str:
     p, fir, cdr, fc, vid, other, total = (
         stats["photos"], stats["fir"], stats["call_records"], stats["forensic"],
@@ -164,21 +168,24 @@ def _narrative(lang: str, stats: dict, top_caller: str | None) -> str:
     phones = stats["phones"]
     if lang == "hi":
         base = (
-            f"इस केस में कुल {total} साक्ष्य दर्ज किए गए हैं — {p} तस्वीरें, "
-            f"{fir} प्राथमिकी, {cdr} कॉल रिकॉर्ड, {fc} फोरेंसिक दस्तावेज़, {vid} सीसीटीवी क्लिप "
-            f"और {other} अन्य फ़ाइलें। विश्लेषण से {phones} फ़ोन नंबर निकाले गए हैं।"
+            f"इस केस में कुल {total} साक्ष्य दर्ज किए गए हैं — {_plural(p, 'तस्वीर', 'तस्वीरें')}, "
+            f"{_plural(fir, 'प्राथमिकी')}, {_plural(cdr, 'कॉल रिकॉर्ड')}, {_plural(fc, 'फोरेंसिक दस्तावेज़')}, "
+            f"{_plural(vid, 'सीसीटीवी क्लिप')} और {_plural(other, 'अन्य फ़ाइल')}। "
+            f"विश्लेषण से {phones} फ़ोन नंबर निकाले गए हैं।"
         )
     elif lang == "hinglish":
         base = (
-            f"Is case me total {total} evidence dharje hain — {p} photos, {fir} FIR, "
-            f"{cdr} call records, {fc} forensic documents, {vid} CCTV clips aur {other} other files. "
+            f"Is case me total {total} evidence dharje hain — {_plural(p, 'photo')}, {_plural(fir, 'FIR')}, "
+            f"{_plural(cdr, 'call record')}, {_plural(fc, 'forensic document')}, "
+            f"{_plural(vid, 'CCTV clip')} aur {_plural(other, 'other file')}. "
             f"Analysis se {phones} phone numbers nikale gaye hain."
         )
     else:
         base = (
-            f"This case dossier aggregates {total} evidence items — {p} photographs, "
-            f"{fir} FIR record, {cdr} call records, {fc} forensic document(s), {vid} CCTV clip(s), "
-            f"and {other} other file(s). The analysis extracted {phones} unique phone number(s)."
+            f"This case dossier aggregates {_plural(total, 'evidence item')} — "
+            f"{_plural(p, 'photograph')}, {_plural(fir, 'FIR record')}, {_plural(cdr, 'call record')}, "
+            f"{_plural(fc, 'forensic document')}, {_plural(vid, 'CCTV clip')}, "
+            f"and {_plural(other, 'other file')}. The analysis extracted {phones} unique phone number(s)."
         )
     if top_caller and stats["call_records"]:
         if lang == "hi":
