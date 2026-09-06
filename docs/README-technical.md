@@ -258,7 +258,7 @@ It auto-reconnects with exponential backoff and drives the connection badge
 
 | Role | Username | Password |
 |------|----------|----------|
-| Super admin | `admin` | `Sentinel@123` |
+| Super admin | `admin` | `admin@1234` |
 
 > In production, override `SEED_ADMIN_PASSWORD` — do not keep the default.
 

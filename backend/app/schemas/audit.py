@@ -35,7 +35,7 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_.-]+$")
     email: EmailStr
     full_name: str | None = None
-    password: str = Field(min_length=12, max_length=128)
+    password: str = Field(min_length=9, max_length=128)
     role_id: str
     unit_id: str | None = None
     is_active: bool = True
@@ -52,4 +52,4 @@ class UserUpdate(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=12, max_length=128)
+    new_password: str = Field(min_length=9, max_length=128)

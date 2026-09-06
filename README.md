@@ -124,7 +124,7 @@ make agent        # simulated agent (needs AGENT_API_TOKEN=...)
 
 | Role         | Username | Password        |
 |--------------|----------|-----------------|
-| Super admin  | `admin`  | `Sentinel@123`  |
+| Super admin  | `admin`  | `admin@1234`  |
 
 > In production, set `SEED_ADMIN_PASSWORD` to a strong value — do not keep the
 > default.
@@ -163,7 +163,7 @@ Backend (`.env`, see `backend/.env.example`):
 | `JWT_SECRET`              | change-me…               | long random secret             |
 | `SEED_DEMO_DATA`          | `false`                  | seed synthetic units/agents/logs + ~180 case records for /criminal |
 | `SEED_ADMIN_USERNAME`     | `admin`                  | seeded super-admin             |
-| `SEED_ADMIN_PASSWORD`     | `Sentinel@123`           | seeded password                |
+| `SEED_ADMIN_PASSWORD`     | `admin@1234`           | seeded password                |
 | `QUERY_LLM_ENABLED`       | `false`                  | off; when on, `/api/query` adds a grounded-narrative summary (see below) |
 | `QUERY_LLM_BASE_URL`      | `https://api.openai.com/v1` | OpenAI-compatible chat-completions endpoint |
 | `QUERY_LLM_API_KEY`       | _(empty)_                | required when `QUERY_LLM_ENABLED=true` |

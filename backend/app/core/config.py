@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "dev-insecure-secret-change-me-0123456789abcdef"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    PASSWORD_MIN_LENGTH: int = 12
+    PASSWORD_MIN_LENGTH: int = 9
     AGENT_TOKEN_BYTES: int = 32
 
     # Database
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     SEED_DEMO_DATA: bool = False
     SEED_ADMIN_USERNAME: str = "admin"
     SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
-    SEED_ADMIN_PASSWORD: str = "Sentinel@123"
+    SEED_ADMIN_PASSWORD: str = "admin@1234"
 
     @property
     def cors_origins(self) -> list[str]:
