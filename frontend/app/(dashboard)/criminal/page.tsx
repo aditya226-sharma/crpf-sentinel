@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { graphService, logService, queryService } from "@/services";
 import type { GraphNodeItem, GraphRelationships, QueryResult } from "@/types";
 import { cn } from "@/lib/utils";
+import { generateLocalNarrative, type LocalNarrativeEvent } from "@/lib/localNarrative";
 
 const NODE_COLORS: Record<string, string> = {
   case: "#f59e0b",
@@ -77,6 +78,9 @@ export default function CriminalDashboardPage() {
   const [nlQuery, setNlQuery] = useState("");
   const [nlResult, setNlResult] = useState<QueryResult | null>(null);
   const [nlBusy, setNlBusy] = useState(false);
+  const [localAi, setLocalAi] = useState(() => typeof window !== "undefined" && (window.localStorage.getItem("crpf-local-ai") ?? "on") === "on");
+  const [localNarr, setLocalNarr] = useState<LocalNarrativeEvent>({ stage: "idle" });
+  const [localText, setLocalText] = useState<string | null>(null);
 
   const overview = useQuery({ queryKey: ["graph", "overview"], queryFn: graphService.overview, refetchInterval: 60000 });
   const central = useQuery({ queryKey: ["graph", "central"], queryFn: () => graphService.central(30), refetchInterval: 60000 });
@@ -233,15 +237,21 @@ export default function CriminalDashboardPage() {
     if (!nlQuery.trim()) return;
     setNlBusy(true);
     setNlResult(null);
+    setLocalNarr({ stage: "idle" });
+    setLocalText(null);
     try {
       const res = await queryService.run(nlQuery);
       setNlResult(res);
+      if (localAi && !res.narrative && res.results.length > 0) {
+        const narrative = await generateLocalNarrative(res, (event) => setLocalNarr(event));
+        if (narrative) setLocalText(narrative);
+      }
     } catch {
       setNlResult(null);
     } finally {
       setNlBusy(false);
     }
-  }, [nlQuery]);
+  }, [nlQuery, localAi]);
 
   const runPath = useCallback(async () => {
     if (!pathA || !pathB) return;
@@ -454,6 +464,33 @@ export default function CriminalDashboardPage() {
                   <Send className="h-3.5 w-3.5" />
                 </Button>
               </div>
+              <div className="flex flex-wrap items-center gap-2 pb-1">
+                <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-muted">
+                  <input
+                    type="checkbox"
+                    className="h-3 w-3 accent-current"
+                    checked={localAi}
+                    onChange={(e) => {
+                      setLocalAi(e.target.checked);
+                      try {
+                        window.localStorage.setItem("crpf-local-ai", e.target.checked ? "on" : "off");
+                      } catch {
+                        /* ignore storage errors */
+                      }
+                    }}
+                  />
+                  Free in-browser AI summary
+                </label>
+                <span className="text-[10px] text-muted">· runs on your device — no key, no cost</span>
+                {(localNarr.stage === "downloading" || localNarr.stage === "loading" || localNarr.stage === "generating") && (
+                  <span className="ml-auto animate-pulse text-[10px] text-accent">
+                    {localNarr.detail ?? `local AI ${localNarr.stage}…`}
+                  </span>
+                )}
+                {localNarr.stage === "error" && (
+                  <span className="ml-auto text-[10px] text-muted">in-browser AI unavailable — template answer shown</span>
+                )}
+              </div>
               {nlBusy && <Skeleton className="h-16 w-full" />}
               {!nlBusy && nlResult && (
                 <div className="rounded-md border border-border p-3">
@@ -464,9 +501,17 @@ export default function CriminalDashboardPage() {
                     </Badge>
                   </div>
                   <p className="mb-2 text-[10px] text-muted">{nlResult.explanation}</p>
-                  {nlResult.narrative && (
+                  {nlResult.narrative && !localText && (
                     <p className="mb-2 rounded-md border border-accent/30 bg-accent/5 p-2 text-[11px] leading-snug text-foreground">
                       {nlResult.narrative}
+                    </p>
+                  )}
+                  {localText && (
+                    <p className="mb-2 rounded-md border border-accent/30 bg-accent/5 p-2 text-[11px] leading-snug text-foreground">
+                      <span className="mb-1 inline-flex items-center gap-1.5">
+                        <Badge variant="outline">in-browser · free</Badge>
+                      </span>
+                      <span className="block">{localText}</span>
                     </p>
                   )}
                   {nlResult.results.length === 0 && <p className="text-[10px] text-muted">No rows matched — no fabricated answers.</p>}

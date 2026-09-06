@@ -180,6 +180,15 @@ Backend (`.env`, see `backend/.env.example`):
 > (`ollama serve` → `QUERY_LLM_BASE_URL=http://localhost:11434/v1`,
 > `QUERY_LLM_API_KEY=any-nonempty`, `QUERY_LLM_MODEL=qwen2.5:0.5b`) — no
 > third-party key, no data ever leaves the box.
+>
+> **Free in-browser option (no accounts, $0).** The *Criminal Intelligence* →
+> "Ask the Corpus" card can generate the same grounded narrative entirely in
+> your own browser with **transformers.js**
+> (`onnx-community/Qwen2.5-0.5B-Instruct`, embedded ONNX, WebAssembly). It is
+> on by default, lazy-loads a ~480 MB model on first use (then cached by the
+> browser), never sends the rows anywhere, and falls back silently to the
+> template answer if inferencing is unavailable. No API key or hosting account
+> of any kind is required.
 
 Agent (`CYBERRAKSHAK_*` env vars override `agent/config/agent.yaml`):
 
