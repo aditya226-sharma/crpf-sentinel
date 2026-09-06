@@ -10,6 +10,7 @@ scoring), so a judge asking "is this actually running?" always gets an honest
 "yes — this is the real detection path".
 """
 
+import json
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,8 @@ from app.models.log import Log
 from app.models.rule import DetectionRule
 from app.models.unit import Unit
 from app.models.user import User
+from app.normalization.engine import normalize_event
+from app.parsers import ParserRegistry
 from app.services.ingest import ingest_payload
 
 SIM_AGENT_PREFIX = "SIM-"
@@ -181,8 +184,71 @@ def simulate_attack(db: Session, scenario: str = "espionage") -> dict:
     }
 
 
+def _bulk_ambient(
+    db: Session, agent: Agent, unit: Unit, event_id: int, rows: list[tuple[datetime, str, str]]
+) -> int:
+    """Insert benign ambient events directly (parse + normalize, then bulk insert).
+
+    These 4624/4688 events never match a rule, so running each through the full
+    transaction-per-event pipeline is pure overhead. We still parse + normalize
+    them through the real code path, then insert in one batch.
+    """
+    parser = ParserRegistry.get("windows")
+    log_rows: list[Log] = []
+    event_rows: list[NormalizedEvent] = []
+    now = datetime.now(timezone.utc)
+    for when, user, process in rows:
+        payload = _structured_payload(
+            event_id, agent.hostname, when,
+            {"SubjectUserName": user, "IpAddress": "10.0.0.8", "LogonType": "3"}
+            if event_id == 4624 else
+            {"SubjectUserName": user, "NewProcessName": process,
+             "CommandLine": "C:\\Windows\\System32\\svchost.exe -k netsvcs"},
+        )
+        parsed = parser.parse(payload)
+        if parsed is None:
+            continue
+        normalized = normalize_event(
+            parsed, unit_id=unit.id, agent_id=agent.id,
+            parser_version=parser.version, format_name=parser.format_name,
+        )
+        if normalized is None:
+            continue
+        log = Log(
+            unit_id=unit.id, agent_id=agent.id, source=parser.format_name,
+            format="windows", raw_log=json.dumps(payload, default=str)[:8000],
+            parsed=True, received_at=now,
+        )
+        log_rows.append(log)
+        event_rows.append(
+            NormalizedEvent(
+                timestamp=normalized["timestamp"], unit_id=normalized["unit_id"],
+                agent_id=normalized["agent_id"], hostname=normalized["hostname"],
+                event_id=normalized["event_id"], provider=normalized["provider"],
+                category=normalized["category"], action=normalized["action"],
+                username=normalized["username"], source_ip=normalized["source_ip"],
+                destination_ip=normalized["destination_ip"],
+                process_name=normalized["process_name"], command_line=normalized["command_line"],
+                logon_type=normalized["logon_type"], status_code=normalized["status_code"],
+                severity=normalized["severity"], parser_version=normalized["parser_version"],
+                is_suspicious=False, simulated=True, extra=normalized["extra"],
+            )
+        )
+    db.add_all(log_rows)
+    db.flush()
+    for log, ev in zip(log_rows, event_rows):
+        ev.log_id = log.id
+    db.add_all(event_rows)
+    return len(event_rows)
+
+
 def seed_demo_log_data(db: Session) -> dict:
-    """Seed a realistic multi-day event/alert backdrop via the real pipeline."""
+    """Seed a realistic multi-day event/alert backdrop.
+
+    Ambient 4624/4688 noise is inserted in bulk (fast); the interesting
+    4625 brute-force bursts and 1102 log-cleans go through the real detection
+    pipeline so they surface as genuine alerts.
+    """
     units = {u.unit_code: u for u in db.query(Unit).all()}
     agents = ensure_sim_agents(db, units)
 
@@ -190,6 +256,16 @@ def seed_demo_log_data(db: Session) -> dict:
     now = datetime.now(timezone.utc)
     unit_codes = list(units.keys())
     events = bursts = 0
+    ambient: list[tuple[datetime, str, str]] = []
+    ambient_unit: dict[tuple[str, int], tuple[Unit, Agent]] = {}
+
+    def _flush_ambient(code: str, event_id: int) -> None:
+        nonlocal events, ambient
+        if not ambient:
+            return
+        unit, agent = ambient_unit[(code, event_id)]
+        events += _bulk_ambient(db, agent, unit, event_id, ambient)
+        ambient = []
 
     for day_offset in range(14):
         day = now - timedelta(days=day_offset)
@@ -199,19 +275,16 @@ def seed_demo_log_data(db: Session) -> dict:
             hour = rng.randint(7, 20)
             for _ in range(rng.randint(6, 14)):
                 when = day.replace(hour=hour, minute=rng.randint(0, 59), second=rng.randint(0, 59))
-                _push(db, agent, unit, 4624, when,
-                      {"SubjectUserName": rng.choice(USERS_POOL), "IpAddress": "10.0.0.8", "LogonType": "3"},
-                      commit=False, publish_event=False)
-                events += 1
+                ambient.append((when, rng.choice(USERS_POOL), ""))
+                ambient_unit[(code, 4624)] = (unit, agent)
+            _flush_ambient(code, 4624)
             for _ in range(rng.randint(8, 20)):
                 when = day.replace(hour=hour, minute=rng.randint(0, 59), second=rng.randint(0, 59))
-                _push(db, agent, unit, 4688, when,
-                      {"SubjectUserName": rng.choice(USERS_POOL),
-                       "NewProcessName": "C:\\Windows\\System32\\"
-                       + rng.choice(["explorer.exe", "chrome.exe", "winword.exe"]),
-                       "CommandLine": "C:\\Windows\\System32\\svchost.exe -k netsvcs"},
-                      commit=False, publish_event=False)
-                events += 1
+                ambient.append((when, rng.choice(USERS_POOL),
+                                "C:\\Windows\\System32\\"
+                                + rng.choice(["explorer.exe", "chrome.exe", "winword.exe"])))
+                ambient_unit[(code, 4688)] = (unit, agent)
+            _flush_ambient(code, 4688)
 
         if rng.random() < 0.5:
             code = rng.choice(unit_codes)
