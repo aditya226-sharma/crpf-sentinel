@@ -13,6 +13,7 @@ from app.models.graph_node import GraphEdge, GraphNode
 from app.models.incident import Incident, IncidentAlert, IncidentNote
 from app.models.ioc import IocEntry
 from app.models.log import Log
+from app.models.osint_sync import OsintSyncState
 from app.models.rule import DetectionRule
 from app.models.unit import Unit
 from app.models.user import Role, User

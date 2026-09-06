@@ -34,6 +34,10 @@ POSTGRELAUNCH_COLUMNS = {
     "roles": [
         ("default_dashboard", "VARCHAR(32)"),
     ],
+    # Graph edges gained a JSON properties bag (OSINT match_score/status).
+    "graph_edges": [
+        ("properties", "JSON"),
+    ],
 }
 
 

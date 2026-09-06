@@ -144,6 +144,25 @@ def normalize_event(
                 "accounts": fields.get("accounts") or [],
             }
         )
+    if format_name == "osint_record":
+        extra.update(
+            {
+                "entity_name": fields.get("entity_name"),
+                "record_type": fields.get("record_type"),
+                "age": fields.get("age"),
+                "gender": fields.get("gender"),
+                "crime_type": fields.get("crime_type"),
+                "crime_description": fields.get("crime_description"),
+                "status": fields.get("status_code"),
+                "location": fields.get("location"),
+                "fir_number": fields.get("fir_number"),
+                "plate_number": fields.get("plate_number"),
+                "phone_number": fields.get("phone_number"),
+                "source_type": fields.get("source_type"),
+                "source_url": fields.get("source_url"),
+                "fetched_at": fields.get("fetched_at"),
+            }
+        )
 
     return {
         "timestamp": timestamp or datetime.now(timezone.utc),

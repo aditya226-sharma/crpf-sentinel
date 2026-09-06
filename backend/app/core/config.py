@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_MB: int = 20
 
+    # VAJRA OSINT aggregator (Layer 3) — poller pulls records from a separate
+    # instance of the vajra-osint service and feeds them into the main pipeline.
+    OSINT_API_URL: str = ""          # e.g. http://osint-service:8000
+    OSINT_API_KEY: str = ""          # shared secret for X-API-Key header
+    OSINT_POLLER_INTERVAL: int = 300 # seconds between poll cycles
+    OSINT_INGEST_URL: str = "http://localhost:8000"  # target for POST /api/logs/ingest
+    OSINT_BRIDGE_AGENT_ID: str = "OSINT-BRIDGE-01"
+    OSINT_BRIDGE_AGENT_TOKEN: str = ""  # required when OSINT_API_URL is set
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]

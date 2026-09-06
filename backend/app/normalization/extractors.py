@@ -18,11 +18,15 @@ def _load() -> dict[str, Callable[[ParsedEvent], dict]]:
     from app.parsers.case_record import CaseRecordParser
     from app.parsers.ipsec import IPsecParser
     from app.parsers.netflow import NetFlowParser
+    from app.parsers.osint_record import OSINTRecordParser
     from app.parsers.syslog import SyslogParser
     from app.parsers.windows import WindowsEventParser
 
     _EXTRACTORS.clear()
-    for parser in (WindowsEventParser, SyslogParser, NetFlowParser, IPsecParser, CaseRecordParser):
+    for parser in (
+        WindowsEventParser, SyslogParser, NetFlowParser, IPsecParser,
+        CaseRecordParser, OSINTRecordParser,
+    ):
         _EXTRACTORS[parser.format_name] = parser.extract_fields
     for name in ParserRegistry.all():
         parser_cls = type(ParserRegistry.get(name))

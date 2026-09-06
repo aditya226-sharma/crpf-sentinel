@@ -110,6 +110,10 @@ def ingest_payload(
         from app.graph.indexer import index_case_record
 
         index_case_record(db, normalized, event_row.id)
+    elif normalized.get("format_name") == "osint_record":
+        from app.graph.indexer import index_osint_record
+
+        index_osint_record(db, normalized, event_row.id)
 
     if matched_ids or ioc_alerts:
         event_row.is_suspicious = True

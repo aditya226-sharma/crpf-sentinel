@@ -7,7 +7,7 @@ import coseBilkent from "cytoscape-cose-bilkent";
 
 cytoscape.use(coseBilkent);
 
-import { Activity, Boxes, Fingerprint, GitBranch, MessageSquareText, Search, Send, Spline, Users } from "lucide-react";
+import { Activity, BadgeCheck, Boxes, ExternalLink, Fingerprint, GitBranch, MessageSquareText, Search, Send, Spline, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,21 @@ const NODE_COLORS: Record<string, string> = {
 interface GraphData {
   nodes: Map<string, GraphNodeItem>;
   edges: { source: string; target: string; relation: string; weight: number }[];
+}
+
+function isOsintNode(node: GraphNodeItem | null | undefined): boolean {
+  const p = node?.properties;
+  return !!p && (p.source === "osint" || p.source_type === "osint");
+}
+
+function osintSourceUrl(node: GraphNodeItem | null | undefined): string {
+  const v = node?.properties?.source_url;
+  return typeof v === "string" && v.length > 0 ? v : "";
+}
+
+function osintSourceType(node: GraphNodeItem | null | undefined): string {
+  const v = node?.properties?.source_type;
+  return typeof v === "string" && v.length > 0 ? v : "osint";
 }
 
 function mergeInto(data: GraphData, rel: GraphRelationships) {
@@ -395,7 +410,14 @@ export default function CriminalDashboardPage() {
                         }}
                       >
                         <span className="truncate">{r.name}</span>
-                        <Badge variant="default">{r.entity_type}</Badge>
+                        <span className="ml-2 flex shrink-0 items-center gap-1.5">
+                          {isOsintNode(r) && (
+                            <Badge variant="outline" className="gap-1 border-accent/50 px-1.5 py-0 text-[9px] text-accent">
+                              <BadgeCheck className="h-2.5 w-2.5" /> OSINT
+                            </Badge>
+                          )}
+                          <Badge variant="default">{r.entity_type}</Badge>
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -575,7 +597,27 @@ export default function CriminalDashboardPage() {
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[selected.entity_type] }} />
                     <span className="text-xs font-medium text-foreground">{selected.name}</span>
                     <Badge variant="default">{selected.entity_type}</Badge>
+                    {isOsintNode(selected) && (
+                      <Badge variant="outline" className="gap-1 border-accent/50 text-accent">
+                        <BadgeCheck className="h-3 w-3" /> Public record · verified
+                      </Badge>
+                    )}
                   </div>
+                  {osintSourceUrl(selected) ? (
+                    <a
+                      href={osintSourceUrl(selected)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1.5 flex items-center gap-1 truncate text-[10px] text-accent underline-offset-2 hover:underline"
+                      title={osintSourceUrl(selected)}
+                    >
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                      <span className="capitalize">{osintSourceType(selected)}</span>
+                      <span className="truncate text-muted">{osintSourceUrl(selected)}</span>
+                    </a>
+                  ) : isOsintNode(selected) ? (
+                    <p className="mt-1.5 text-[10px] capitalize text-muted">{osintSourceType(selected)} source</p>
+                  ) : null}
                   {selectedRel.edges.length === 0 && <p className="text-[11px] text-muted">No direct relationships.</p>}
                   {selectedRel.edges.slice(0, 12).map((e, i) => {
                     const otherId = e.source === selected.id ? e.target : e.source;

@@ -64,3 +64,54 @@ async def on_startup() -> None:
         import logging
 
         logging.getLogger("cyberrakshak.startup").exception("startup seeding failed: %s", exc)
+    _start_osint_poller()
+
+
+def _start_osint_poller() -> None:
+    """Start the VAJRA OSINT bridge thread when configured (opt-in).
+
+    Requires OSINT_API_URL + OSINT_API_KEY (+ an ingest URL and bridge-agent
+    token for HTTP publishing). Records flow into the main pipeline through the
+    exact same /api/logs/ingest path as every other format.
+    """
+    import logging
+
+    logger = logging.getLogger("cyberrakshak.osint")
+
+    try:
+        from app.core.config import get_settings as _gs
+
+        cfg = _gs()
+    except Exception:  # pragma: no cover - config always available
+        return
+
+    if not cfg.OSINT_API_URL or not cfg.OSINT_API_KEY:
+        return
+
+    try:
+        from app.integrations.osint_client import (
+            OSINTClient,
+            ensure_osint_bridge_agent,
+            publish_in_process,
+            publish_to_ingest,
+            start_poller_thread,
+        )
+        from app.database.session import SessionLocal
+
+        client = OSINTClient(cfg.OSINT_API_URL, cfg.OSINT_API_KEY)
+
+        def _publish(record: dict) -> dict:
+            if cfg.OSINT_BRIDGE_AGENT_TOKEN:
+                return publish_to_ingest(
+                    record,
+                    ingest_url=cfg.OSINT_INGEST_URL,
+                    agent_id=cfg.OSINT_BRIDGE_AGENT_ID,
+                    agent_token=cfg.OSINT_BRIDGE_AGENT_TOKEN,
+                )
+            with SessionLocal() as db:
+                agent, _ = ensure_osint_bridge_agent(db)
+                return publish_in_process(db, record, agent=agent)
+
+        start_poller_thread(client, publish_fn=_publish)
+    except Exception as exc:  # pragma: no cover - poller must never block startup
+        logger.warning("OSINT poller not started: %s", exc)

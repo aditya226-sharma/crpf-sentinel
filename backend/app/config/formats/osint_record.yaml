@@ -1,0 +1,14 @@
+defaults:
+  category: osint
+  action: record_observed
+  severity: informational
+
+codes:
+  "5101":
+    category: osint
+    action: person_record_observed
+    severity: informational
+  "5102":
+    category: osint
+    action: unresolved_lead_observed
+    severity: informational

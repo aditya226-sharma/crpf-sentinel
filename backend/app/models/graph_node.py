@@ -38,6 +38,7 @@ class GraphEdge(Base):
     target_id = Column(String(32), nullable=False, index=True)
     relation = Column(String(64), nullable=False)
     weight = Column(Integer, nullable=False, default=1)
+    properties = Column(JSON, default=dict)
     event_row_id = Column(String(32), nullable=True)
     source_text = Column(String(1024), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

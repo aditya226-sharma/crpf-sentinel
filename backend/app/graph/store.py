@@ -36,6 +36,12 @@ RELATION = {
     "person_has_account": "HAS",
     "person_financial_to_person": "FUNDS",
     "phone_contacts_phone": "CONTACTS",
+    "person_has_phone": "HAS",
+    "person_has_vehicle": "HAS",
+    "person_has_account": "HAS",
+    "person_located": "LOCATED",
+    "same_as": "SAME_AS",
+    "possible_match": "POSSIBLE_MATCH",
     "shared": "SHARED",
 }
 
@@ -53,7 +59,7 @@ class GraphStore:
 
     def create_node(self, entity_type: str, value: str, name: str | None = None, properties: dict | None = None) -> Any: ...  # type: ignore[empty-body]  # noqa: E704
 
-    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None) -> None: ...  # type: ignore[empty-body]  # noqa: E704
+    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None, properties: dict | None = None) -> None: ...  # type: ignore[empty-body]  # noqa: E704
 
     def overview(self) -> dict: ...  # type: ignore[empty-body]  # noqa: E704
 
@@ -108,7 +114,7 @@ class RelationalGraphStore(GraphStore):
             "properties": node.properties or {},
         }
 
-    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None) -> None:
+    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None, properties: dict | None = None) -> None:
         existing = (
             self.db.query(GraphEdge)
             .filter(
@@ -122,6 +128,10 @@ class RelationalGraphStore(GraphStore):
             existing.weight += 1
             if event_row_id and not existing.event_row_id:
                 existing.event_row_id = event_row_id
+            if properties:
+                merged = dict(existing.properties or {})
+                merged.update(properties)
+                existing.properties = merged
             self.db.add(existing)
             self.db.flush()
             return
@@ -132,6 +142,7 @@ class RelationalGraphStore(GraphStore):
                 target_id=target_id,
                 relation=relation,
                 weight=1,
+                properties=properties or {},
                 event_row_id=event_row_id,
                 source_text=source_text[:1000] if source_text else None,
                 created_at=_now(),
@@ -224,6 +235,7 @@ class RelationalGraphStore(GraphStore):
                         "target": b,
                         "relation": e.relation,
                         "weight": e.weight,
+                        "properties": e.properties or {},
                     }
                 )
                 for nid in (a, b):
@@ -371,15 +383,15 @@ class Neo4jGraphStore(GraphStore):
         nid = record["id"] if record else value
         return {"id": nid, "entity_type": entity_type, "value": value, "name": name or value, "properties": properties or {}}
 
-    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None) -> None:
+    def create_edge(self, source_id: str, target_id: str, relation: str, event_row_id: str | None = None, source_text: str | None = None, properties: dict | None = None) -> None:
         with self.driver.session() as session:
             session.run(
                 "MATCH (a) WHERE elementId(a) = $a "
                 "MATCH (b) WHERE elementId(b) = $b "
                 "MERGE (a)-[r:REL {relation: $rel}]->(b) "
-                "ON CREATE SET r.weight = 1, r.event_row_id = $event_row_id "
+                "ON CREATE SET r.weight = 1, r.event_row_id = $event_row_id, r.properties = $props "
                 "ON MATCH SET r.weight = coalesce(r.weight, 0) + 1",
-                a=source_id, b=target_id, rel=relation, event_row_id=event_row_id,
+                a=source_id, b=target_id, rel=relation, event_row_id=event_row_id, props=properties or {},
             )
 
     def overview(self) -> dict:
