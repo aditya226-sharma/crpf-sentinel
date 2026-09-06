@@ -69,9 +69,13 @@ pip install -r requirements.txt
 python -m app.seed.seed_all        # tables + roles + admin + rules + units
 uvicorn app.main:app --reload --port 8000
 
+# optional — run the pipeline smoke suite (isolated SQLite DB)
+pip install -r requirements-dev.txt
+python -m pytest tests
+
 # 2) Frontend
 cd frontend
-npm install
+npm ci
 npm run dev                        # http://localhost:3000
 
 # 3) Agent (simulated events; works on any OS)
