@@ -38,6 +38,8 @@ import type {
   CaseIntakeItem,
   CaseReport,
   ReportLanguage,
+  DemoSimulateResult,
+  DemoResetResult,
 } from "@/types";
 
 // Auth
@@ -305,6 +307,11 @@ export const caseIntakeService = {
     }
     return res.blob();
   },
+};
+
+export const demoService = {
+  simulate: () => api.post<DemoSimulateResult>("/api/demo/simulate"),
+  reset: () => api.post<DemoResetResult>("/api/demo/reset"),
 };
 
 async function handle<T>(response: Response): Promise<T> {

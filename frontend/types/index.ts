@@ -268,6 +268,31 @@ export interface AgentHealthItem {
   memory_usage: number;
   simulated: boolean;
   status: string;
+  buffer_size?: number;
+  sync_status?: string | null;
+}
+
+export interface DemoSimulateAlert {
+  id: string;
+  title: string;
+  severity: string;
+  risk_score: number;
+  mitre?: string | null;
+}
+
+export interface DemoSimulateResult {
+  status: string;
+  scenario: string;
+  phases: string[];
+  events_ingested: number;
+  alerts_fired: DemoSimulateAlert[];
+  units: string[];
+}
+
+export interface DemoResetResult {
+  status: string;
+  removed_alerts: number;
+  removed_events: number;
 }
 
 export interface DashboardSummary {

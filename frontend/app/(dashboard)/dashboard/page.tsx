@@ -12,6 +12,10 @@ import { SeverityDonut } from "@/components/charts/severity-donut";
 import { ActiveThreats } from "@/components/dashboard/active-threats";
 import { LiveEventStream } from "@/components/dashboard/live-event-stream";
 import { UnitSecurityMap } from "@/components/dashboard/unit-security-map";
+import { SimulateAttackButton } from "@/components/dashboard/simulate-attack-button";
+import { ExecutiveRiskGauge } from "@/components/dashboard/executive-risk-gauge";
+import { AgentConnectionStatus } from "@/components/dashboard/agent-connection-status";
+import { ImpactMetricCard } from "@/components/dashboard/impact-metric-card";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { SeverityBadge } from "@/components/shared/severity-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -124,6 +128,7 @@ export default function DashboardPage() {
         description={`Real-time posture across all deployed units and Windows agents · Welcome back, ${user?.full_name?.split(" ")[0] ?? "Analyst"}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <SimulateAttackButton />
             <Badge variant="success" className="gap-1.5 text-[10px]">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -160,6 +165,12 @@ export default function DashboardPage() {
             {kpis.map(({ kpi, icon, spark, valueClassName }) => (
               <KpiCard key={kpi.label} kpi={kpi} icon={icon} spark={spark} valueClassName={valueClassName} />
             ))}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <ExecutiveRiskGauge risk={data.risk_score} />
+            <AgentConnectionStatus agents={data.agent_health} />
+            <ImpactMetricCard />
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">

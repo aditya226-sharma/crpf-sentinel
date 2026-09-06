@@ -32,12 +32,19 @@ def seed_all() -> dict:
         rules_seeded = seed_rules(db, created_by=admin)
         units = seed_units(db)
         case_records = 0
+        demo = {}
         if settings.SEED_DEMO_DATA:
             from app.seed.case_records import seed_case_records
 
             case_records = seed_case_records(db)
+            # Realistic event/alert backdrop + coherent hero incidents via the
+            # real pipeline (only in the demo-enabled environment).
+            from app.services import demo as demo_svc
+
+            demo["log_backdrop"] = demo_svc.seed_demo_log_data(db)
+            demo["hero_incidents"] = demo_svc.seed_hero_incidents(db)
         db.commit()
-        return {"rules": rules_seeded, "units": len(units), "case_records": case_records}
+        return {"rules": rules_seeded, "units": len(units), "case_records": case_records, "demo": demo}
     finally:
         db.close()
 

@@ -328,6 +328,8 @@ def _agent_health(db: Session, unit_ids: list[str] | None, limit: int = 8) -> li
             "memory_usage": a.memory_usage,
             "simulated": a.simulated,
             "status": a.status,
+            "buffer_size": a.buffer_size,
+            "sync_status": a.last_sync_status,
         }
         for a, u in q.all()
     ]

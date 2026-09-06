@@ -69,6 +69,8 @@ class AgentHealthItem(BaseModel):
     memory_usage: float
     simulated: bool = False
     status: str
+    buffer_size: int = 0
+    sync_status: str | None = None
 
 
 class DashboardSummary(BaseModel):

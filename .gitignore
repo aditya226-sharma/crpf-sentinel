@@ -43,3 +43,6 @@ agent/config/agent.live-sim.yaml
 
 # Agent runtime logs
 agent/logs/
+
+# opencode session notes
+.opencode/
