@@ -66,6 +66,9 @@ class Settings(BaseSettings):
 
     # Seeding
     SEED_DEMO_DATA: bool = False
+    # Run demo reset in a detached worker thread (avoids hosted-Postgres
+    # timeouts) — set alongside SEED_DEMO_DATA in the deployed demo instance.
+    DEMO_BACKGROUND_RESET: bool = False
     SEED_ADMIN_USERNAME: str = "admin"
     SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
     SEED_ADMIN_PASSWORD: str = "admin@1234"
