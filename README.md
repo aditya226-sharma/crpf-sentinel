@@ -174,6 +174,12 @@ Backend (`.env`, see `backend/.env.example`):
 > grounded natural-language narrative over the template results — the model is
 > instructed to use only the returned rows and to say plainly when none match;
 > any LLM failure silently degrades back to the template answer.
+>
+> **Key-free option (verified).** Any OpenAI-compatible endpoint works, so you
+> can run the narrative entirely on your own hardware with **Ollama**
+> (`ollama serve` → `QUERY_LLM_BASE_URL=http://localhost:11434/v1`,
+> `QUERY_LLM_API_KEY=any-nonempty`, `QUERY_LLM_MODEL=qwen2.5:0.5b`) — no
+> third-party key, no data ever leaves the box.
 
 Agent (`CYBERRAKSHAK_*` env vars override `agent/config/agent.yaml`):
 
