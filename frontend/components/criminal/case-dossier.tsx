@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   Camera,
   File as FileIcon,
@@ -70,6 +70,9 @@ export function CaseDossier() {
   const [creating, setCreating] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const browseRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   const [lang, setLang] = useState<ReportLanguage>("en");
   const [report, setReport] = useState<CaseReport | null>(null);
@@ -204,6 +207,17 @@ export function CaseDossier() {
     );
   };
 
+  const addFiles = (incoming: FileList | File[]) => {
+    setFiles((prev) => [...prev, ...Array.from(incoming)]);
+  };
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (!e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    addFiles(e.dataTransfer.files);
+  };
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -279,17 +293,53 @@ export function CaseDossier() {
                 </span>
                 {selectedCase && <Badge variant="default">{selectedCase.status}</Badge>}
               </div>
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border bg-surface2 px-3 py-5 text-[11px] text-muted hover:border-accent/50">
-                <Upload className="h-4 w-4" />
-                Click to choose files — photos, FIR, CDR, forensic, CCTV, …
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={onDrop}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-3 py-5 text-[11px] text-muted hover:border-accent/50",
+                  dragging ? "border-accent bg-accent/10" : "border-border bg-surface2",
+                )}
+              >
+                <Upload className="h-5 w-5" />
+                <span className="text-center">
+                  Drag &amp; drop case evidence here, or add them below — photos, FIR, CDR, forensic, CCTV, …
+                </span>
+                <span className="flex flex-wrap items-center justify-center gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => browseRef.current?.click()}>
+                    Browse files
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => folderRef.current?.click()}>
+                    Choose folder
+                  </Button>
+                </span>
                 <input
+                  ref={browseRef}
                   type="file"
                   multiple
                   className="hidden"
                   accept="*/*"
-                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                 />
-              </label>
+                <input
+                  ref={folderRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  {...({ webkitdirectory: "" } as Record<string, unknown>)}
+                  onChange={(e) => {
+                    if (e.target.files) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
               {files.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {files.map((f, i) => (
