@@ -223,7 +223,7 @@ export default function CriminalDashboardPage() {
     });
     cyRef.current.on("tap", "node", (evt) => {
       const nodeId = evt.target.id();
-      void selectNode(nodeId);
+      void selectNodeRef.current(nodeId);
     });
     return () => {
       cyRef.current?.destroy();
@@ -243,6 +243,9 @@ export default function CriminalDashboardPage() {
       cyRef.current.$(`#${CSS.escape(nodeId)}`).addClass("selected");
     }
   }, [graphData.nodes]);
+
+  const selectNodeRef = useRef(selectNode);
+  selectNodeRef.current = selectNode;
 
   const runSearch = useCallback(async (term: string) => {
     if (!term.trim()) {

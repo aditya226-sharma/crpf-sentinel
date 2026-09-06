@@ -59,12 +59,14 @@ def _timeline(db: Session, period: str, unit_ids: list[str] | None) -> list[dict
         db.query(bucket, func.count(NormalizedEvent.id))
         .filter(NormalizedEvent.timestamp >= since)
     )
+    alert_bucket = _bucket_expr(db, period, Alert, "created_at")
     alert_query = (
-        db.query(_bucket_expr(db, period, Alert, "created_at"), func.count(Alert.id))
+        db.query(alert_bucket, func.count(Alert.id))
         .filter(Alert.created_at >= since)
     )
+    critical_bucket = _bucket_expr(db, period, Alert, "created_at")
     critical_query = (
-        db.query(_bucket_expr(db, period, Alert, "created_at"), func.count(Alert.id))
+        db.query(critical_bucket, func.count(Alert.id))
         .filter(Alert.created_at >= since, Alert.severity == "critical")
     )
     if unit_ids:
@@ -72,9 +74,9 @@ def _timeline(db: Session, period: str, unit_ids: list[str] | None) -> list[dict
         alert_query = alert_query.filter(Alert.unit_id.in_(unit_ids))
         critical_query = critical_query.filter(Alert.unit_id.in_(unit_ids))
 
-    event_rows = dict(event_query.group_by("bucket").all())
-    alert_rows = dict(alert_query.group_by("bucket").all())
-    critical_rows = dict(critical_query.group_by("bucket").all())
+    event_rows = dict(event_query.group_by(bucket).all())
+    alert_rows = dict(alert_query.group_by(alert_bucket).all())
+    critical_rows = dict(critical_query.group_by(critical_bucket).all())
 
     buckets = sorted(set(list(event_rows.keys()) + list(alert_rows.keys())))
     points = []

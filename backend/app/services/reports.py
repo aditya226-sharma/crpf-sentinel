@@ -58,7 +58,7 @@ def _rows_for(
         )
         rows = [
             [str(bucket), int(events), int(suspicious or 0)]
-            for bucket, events, suspicious in q.group_by("bucket").order_by("bucket").all()
+            for bucket, events, suspicious in q.group_by(bucket_expr).order_by(bucket_expr).all()
         ]
         return "Hourly event summary", rows, ["timestamp", "events", "suspicious"]
 

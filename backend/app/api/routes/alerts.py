@@ -71,7 +71,7 @@ def list_alerts(
     if unit_scope:
         query = query.filter(Alert.unit_id.in_(unit_scope))
     if severity:
-        query = query.filter(Alert.severity == severity)
+        query = query.filter(Alert.severity == severity.lower())
     if status:
         query = query.filter(Alert.status == status)
     if unit_id:

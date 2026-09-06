@@ -95,6 +95,11 @@ export function CaseDossier() {
   }, []);
 
   useEffect(() => {
+    setFiles([]);
+    setReport(null);
+  }, [selectedId]);
+
+  useEffect(() => {
     void refreshList();
   }, [refreshList]);
 

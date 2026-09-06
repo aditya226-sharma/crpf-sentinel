@@ -78,10 +78,10 @@ def me(user: User = Depends(get_current_user)):
 
 
 @router.post("/logout", status_code=204)
-def logout(user: User = Depends(get_current_user), request: Request = None, db: Session = Depends(get_db)):
+def logout(request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     record_audit(
         db, "logout", "authentication",
-        username=user.username, user_id=user.id, ip_address=client_ip(request) if request else None,
+        username=user.username, user_id=user.id, ip_address=client_ip(request),
     )
     db.commit()
     return None

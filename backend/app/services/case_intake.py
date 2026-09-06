@@ -368,7 +368,7 @@ def _bars(pairs: list[tuple[str, int]]) -> str:
         pct = round(value / greatest * 100, 1)
         parts.append(
             '<div class="bar-row">'
-            f'<div class="bar-label">{label} — {value}</div>'
+            f'<div class="bar-label">{_esc(label)} — {value}</div>'
             '<div class="bar-track"><div class="bar-fill" '
             f'style="width:{pct}%"></div></div></div>'
         )
@@ -453,7 +453,7 @@ def render_report_html(case, documents, lang: str, analysis: dict) -> str:
     for ph in photos:
         if ph["embedded"]:
             photo_boxes.append(
-                '<div class="photo-box"><img src="' + ph["data_url"] + '" alt="">'
+                '<div class="photo-box"><img src="' + _esc(ph["data_url"]) + '" alt="">'
                 f'<div class="photo-cap">{_esc(ph["filename"])}</div></div>'
             )
         else:
@@ -554,7 +554,8 @@ def analyze_case(case, documents: list, lang: str) -> dict:
         path = d.stored_path
         kind = d.kind
         if path and os.path.isfile(path):
-            raw = open(path, "rb").read()
+            with open(path, "rb") as f:
+                raw = f.read()
             ext = _ext_name(d.filename)
             if kind == "fir":
                 tx = _decode_text(raw)
@@ -571,9 +572,12 @@ def analyze_case(case, documents: list, lang: str) -> dict:
                     _merge_intel(intel, _extract_intel(tx))
             elif kind == "document" and ext in _TEXT_EXTS:
                 _merge_intel(intel, _extract_intel(_decode_text(raw)))
-            elif kind == "photo" and ext in _IMAGE_EXTS - {"webp", "heic"}:
-                data_url = _image_data_url(raw, d.mime) if len(raw) <= 8 * 1024 * 1024 else None
-                photos.append({"filename": d.filename, "data_url": data_url, "embedded": bool(data_url)})
+            elif kind == "photo":
+                if ext in _IMAGE_EXTS - {"webp", "heic"} and len(raw) <= 8 * 1024 * 1024:
+                    data_url = _image_data_url(raw, d.mime)
+                    photos.append({"filename": d.filename, "data_url": data_url, "embedded": True})
+                else:
+                    photos.append({"filename": d.filename, "data_url": None, "embedded": False})
 
     total = len(documents)
     stats = {

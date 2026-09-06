@@ -129,7 +129,7 @@ def list_incidents(
     if status:
         query = query.filter(Incident.status == status)
     if severity:
-        query = query.filter(Incident.severity == severity)
+        query = query.filter(Incident.severity == severity.lower())
     if unit_id:
         query = query.filter(Incident.unit_id == unit_id)
     if q:
@@ -440,7 +440,7 @@ def incident_events(
             "command_line": e.command_line,
             "matched_rule_id": e.matched_rule_id,
         }
-        for e in rows
+        for e in unique
     ]
 
 
