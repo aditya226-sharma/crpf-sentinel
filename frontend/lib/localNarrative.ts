@@ -24,17 +24,35 @@ const SYSTEM_PROMPT =
 
 let pipelinePromise: Promise<unknown> | null = null;
 
+function transcriptToText(gen: unknown): string {
+  if (Array.isArray(gen)) {
+    for (let i = gen.length - 1; i >= 0; i--) {
+      const m = gen[i] as { role?: unknown; content?: unknown } | undefined;
+      if (m && m.role === "assistant" && typeof m.content === "string" && m.content.trim()) {
+        return m.content;
+      }
+    }
+  }
+  return typeof gen === "string" ? gen : "";
+}
+
 function extractGenerated(text: unknown): string {
   if (Array.isArray(text)) {
     for (const item of text) {
-      const v = item && (item.generated_text ?? item.output_text);
-      if (typeof v === "string") return v;
+      const obj = item as Record<string, unknown> | null | undefined;
+      const fromGen = obj?.generated_text ?? obj?.output_text;
+      const candidate = transcriptToText(fromGen);
+      if (candidate) return candidate;
+    }
+    for (const item of text) {
+      const obj = item as Record<string, unknown> | null | undefined;
+      const direct = obj?.generated_text ?? obj?.output_text;
+      if (typeof direct === "string" && direct.trim()) return direct;
     }
     return "";
   }
-  const obj = text as { generated_text?: unknown; output_text?: unknown } | null;
-  const v = obj?.generated_text ?? obj?.output_text;
-  return typeof v === "string" ? v : String(text ?? "");
+  const obj = text as Record<string, unknown> | null;
+  return transcriptToText(obj?.generated_text ?? obj?.output_text);
 }
 
 async function loadPipeline(
