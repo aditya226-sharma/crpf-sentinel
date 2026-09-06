@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
     SEED_ADMIN_PASSWORD: str = "admin@1234"
 
+    # Crime case evidence + report generation
+    UPLOAD_DIR: str = "./uploads"
+    MAX_UPLOAD_MB: int = 20
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]

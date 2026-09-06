@@ -11,3 +11,4 @@ email-validator>=2.2.0
 python-multipart>=0.0.20
 httpx>=0.28.1
 python-dateutil>=2.9.0.post0
+weasyprint>=62.3

@@ -6,6 +6,7 @@ from app.database.base import Base
 from app.models.agent import Agent
 from app.models.alert import Alert, AlertEvent
 from app.models.audit import AuditLog, Notification
+from app.models.case_intake import CaseDocument, CaseIntake
 from app.models.event import NormalizedEvent
 from app.models.flow import Flow
 from app.models.graph_node import GraphEdge, GraphNode
@@ -22,6 +23,8 @@ __all__ = [
     "Alert",
     "AlertEvent",
     "AuditLog",
+    "CaseDocument",
+    "CaseIntake",
     "DetectionRule",
     "GraphEdge",
     "GraphNode",

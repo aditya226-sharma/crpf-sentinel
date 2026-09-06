@@ -9,6 +9,7 @@ from app.api.routes import (
     assets,
     audit,
     auth,
+    case_intake,
     dashboard,
     graph,
     health,
@@ -48,4 +49,5 @@ api_router.include_router(users.router)
 api_router.include_router(audit.router)
 api_router.include_router(reports.router)
 api_router.include_router(query.router)
+api_router.include_router(case_intake.router)
 api_router.include_router(stream.router)
