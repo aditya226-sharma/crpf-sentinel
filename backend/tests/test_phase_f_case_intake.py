@@ -123,6 +123,23 @@ def test_report_hindi_and_hinglish(client: TestClient, admin_headers: dict[str, 
     assert bad.status_code == 400
 
 
+def test_case_lookup_accepts_internal_id(client: TestClient, admin_headers: dict[str, str]):
+    """The frontend keys on the *internal* DB id for detail/upload; the API
+    must resolve both the public CSI-xxx case_id and the internal id."""
+    case = _create_case(client, admin_headers)
+    assert case["id"] != case["case_id"]
+    detail = client.get(f"/api/case-intake/{case['id']}", headers=admin_headers)
+    assert detail.status_code == 200
+    assert detail.json()["case_id"] == case["case_id"]
+    up = client.post(
+        f"/api/case-intake/{case['id']}/documents",
+        headers=admin_headers,
+        files=[("files", ("crime-scene-1.png", _PNG, "image/png"))],
+    )
+    assert up.status_code == 201, up.text
+    assert up.json()["accepted"] == 1
+
+
 def test_report_pdf_download(client: TestClient, admin_headers: dict[str, str]):
     weasyprint = pytest.importorskip("weasyprint")
     assert weasyprint is not None  # keep linter happy

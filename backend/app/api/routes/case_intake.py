@@ -47,7 +47,7 @@ def _case_out(case: CaseIntake, documents: list[CaseDocument] | None = None) -> 
 def _get_case_or_404(db: Session, case_id: str) -> CaseIntake:
     case = (
         db.query(CaseIntake)
-        .filter(CaseIntake.case_id == case_id)
+        .filter((CaseIntake.case_id == case_id) | (CaseIntake.id == case_id))
         .first()
     )
     if not case:

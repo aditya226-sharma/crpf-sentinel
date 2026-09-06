@@ -86,7 +86,7 @@ export function CaseDossier() {
     try {
       const items = await caseIntakeService.list();
       setCases(items);
-      setSelectedId(items[0]?.id ?? null);
+      setSelectedId(items[0]?.case_id ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load cases");
     } finally {
@@ -123,7 +123,7 @@ export function CaseDossier() {
   }, [selectedId]);
 
   const selectedCase = useMemo(
-    () => cases.find((c) => c.id === selectedId) ?? detail,
+    () => cases.find((c) => c.case_id === selectedId) ?? detail,
     [cases, selectedId, detail],
   );
   const displayDoc: CaseDocument[] = useMemo(
@@ -141,7 +141,7 @@ export function CaseDossier() {
       setFir("");
       setDescription("");
       await refreshList();
-      setSelectedId(created.id);
+      setSelectedId(created.case_id);
       setNotice(`Case ${created.case_id} created — now upload evidence.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create case");
@@ -274,7 +274,7 @@ export function CaseDossier() {
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => setSelectedId(c.id)}
+                      onClick={() => setSelectedId(c.case_id)}
                       className={cn(
                         "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[11px] hover:bg-surface2",
                         selectedId === c.id && "bg-surface2",
