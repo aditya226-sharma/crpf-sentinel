@@ -182,3 +182,29 @@ def test_reset_truncate_path_on_postgres():
     finally:
         db.close()
         engine.dispose()
+
+
+def test_sustain_refreshes_heartbeats(client: TestClient, admin_headers: dict[str, str]):
+    """Keepalive must reset stale simulated-agent heartbeats (and only those)."""
+    from datetime import datetime, timedelta
+
+    from app.database.session import SessionLocal
+    from app.models.agent import Agent
+    from app.services.demo import simulate_attack, sustain_environment
+
+    with SessionLocal() as db:
+        simulate_attack(db)
+        agents = db.query(Agent).filter(Agent.simulated.is_(True)).all()
+        assert agents, "simulated agents expected after simulate_attack"
+        stale_before = {a.agent_id: a.last_seen_at for a in agents}
+        for a in agents:
+            a.last_seen_at = datetime.utcnow() - timedelta(hours=1)
+        db.commit()
+
+        result = sustain_environment(db)
+        assert result["agents_heartbeat"] == len(agents), result
+
+        refreshed = db.query(Agent).filter(Agent.agent_id.in_(stale_before)).all()
+        for a in refreshed:
+            age = (datetime.utcnow() - a.last_seen_at).total_seconds()
+            assert age < 30, f"heartbeat not refreshed: {a.agent_id} age={age}s"

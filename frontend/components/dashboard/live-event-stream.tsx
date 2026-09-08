@@ -49,17 +49,19 @@ function EventRow({ event, index }: { event: LiveEventItem; index: number }) {
 
 export function LiveEventStream() {
   const { events, connection } = useLiveStream();
+  const last = events[0];
+  const liveEvents = connection === "live";
 
   return (
-    <Card>
+    <Card className="flex h-full min-h-0 flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-1">
         <CardTitle className="flex items-center gap-2">
           <RadarIcon className="h-4 w-4 text-accent" />
           Live Security Events
         </CardTitle>
-        <Badge variant={connection === "live" ? "success" : "medium"} className="text-[9px]">
+        <Badge variant={liveEvents ? "success" : "medium"} className="text-[9px]">
           <span className="relative flex h-1.5 w-1.5">
-            {connection === "live" && (
+            {liveEvents && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             )}
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
@@ -67,7 +69,7 @@ export function LiveEventStream() {
           {connection === "live" ? "LIVE" : connection.toUpperCase()}
         </Badge>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-1 min-h-0 flex-col p-0">
         <div className="grid grid-cols-[64px_1.2fr_1.4fr_1fr_1.6fr_auto] items-center gap-2 border-b border-border bg-surface3 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted">
           <span>Time</span>
           <span>Unit</span>
@@ -77,19 +79,31 @@ export function LiveEventStream() {
           <span>Severity</span>
         </div>
         {events.length === 0 ? (
-          <div className="flex h-56 items-center justify-center">
+          <div className="flex flex-1 items-center justify-center">
             <p className="text-xs text-muted">Waiting for incoming events…</p>
           </div>
         ) : (
-          <ScrollArea className="h-56">
-            <div>
-              {events.slice(0, 40).map((event, i) => (
-                <EventRow key={`${event.id ?? event.timestamp}-${i}`} event={event} index={i} />
-              ))}
+          <ScrollArea className="min-h-48 flex-1">
+            <div className="flex min-h-full flex-col">
+              <div>
+                {events.slice(0, 60).map((event, i) => (
+                  <EventRow key={`${event.id ?? event.timestamp}-${i}`} event={event} index={i} />
+                ))}
+              </div>
+              <div className="scanline-bg mt-auto">
+                <div className="flex h-8 items-center justify-center gap-1.5 text-[10px] text-muted/60">
+                  <span className="animate-pulse-dot h-1 w-1 rounded-full bg-accent/60" />
+                  {liveEvents ? "streaming — new events appear at the top" : "stream paused — reconnecting"}
+                </div>
+              </div>
             </div>
           </ScrollArea>
         )}
-        <div className="border-t border-border px-3 py-2 text-right">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2 text-[10px]">
+          <span className="font-mono text-muted">
+            buffer: <span className="text-slate-300">{events.length}</span> events
+            {last?.unit_name ? ` · latest from ${last.unit_name}` : ""}
+          </span>
           <Link href="/logs" className="text-[11px] text-accent hover:underline">
             Open log explorer →
           </Link>

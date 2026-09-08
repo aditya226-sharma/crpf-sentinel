@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardService, statsService, incidentService } from "@/services";
 import type { KpiValue } from "@/types";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { OpsStrip } from "@/components/dashboard/ops-strip";
 import { TimelineChart } from "@/components/charts/timeline-chart";
 import { SeverityDonut } from "@/components/charts/severity-donut";
 import { ActiveThreats } from "@/components/dashboard/active-threats";
@@ -33,6 +34,14 @@ const PERIODS = [
   { key: "7d", label: "7D" },
   { key: "30d", label: "30D" },
 ];
+
+function greetingFor(firstName: string | undefined): string {
+  const hour = new Date().getHours();
+  const timeOfDay = hour >= 5 && hour < 12 ? "morning" : hour >= 12 && hour < 17 ? "afternoon" : hour >= 17 && hour < 21 ? "evening" : "night shift hand-off";
+  const who = firstName ?? "Analyst";
+  if (timeOfDay === "night shift hand-off") return `Good ${timeOfDay}, ${who} — handing over to the next shift.`;
+  return `Good ${timeOfDay}, ${who}.`;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -65,45 +74,49 @@ export default function DashboardPage() {
   const onlineAgents = Number(String(data?.active_agents.value ?? "").split("/")[0].trim()) || 0;
   const agentsTotal = stats?.total_agents ?? 0;
   const agentsPct = agentsTotal ? Math.round(((stats?.agents_online ?? 0) / agentsTotal) * 1000) / 10 : 0;
+  const greeting = greetingFor(user?.full_name?.split(" ")[0] ?? user?.username.split(" ")[0] ?? "Analyst");
 
-  const kpis: { kpi: KpiValue; icon: string; spark?: number[]; valueClassName?: string }[] = data
+  const description = useMemo(() => {
+    const base = "Real-time posture across all deployed CRPF units and Windows agents";
+    return data?.generated_at ? `${greeting} ${base}. Summary generated a few seconds ago, refreshes every 30s.` : greeting;
+  }, [greeting, data?.generated_at]);
+
+  const kpis: { kpi: KpiValue; icon: string; tone: "neutral" | "ok" | "warn" | "critical"; spark?: number[]; valueClassName?: string }[] = data
     ? [
         {
           kpi: data.total_events,
           icon: "Database",
+          tone: "neutral",
           spark: data.timeline.map((t) => t.events),
         },
         {
           kpi: data.critical_alerts,
           icon: "ShieldAlert",
+          tone: "critical",
           valueClassName: "text-critical",
           spark: data.timeline.map((t) => t.critical_alerts),
         },
         {
-          kpi: {
-            label: "Active Alerts",
-            value: stats?.open_alerts ?? data.high_alerts.value,
-            change_pct: null,
-            compare_label: "open alerts",
-            detail: `${stats?.open_alerts ?? 0} open across all units`,
-            status: "open",
-          },
+          kpi: data.high_alerts,
           icon: "BellRing",
+          tone: "warn",
           valueClassName: "text-high",
           spark: data.timeline.map((t) => t.alerts),
         },
         {
           kpi: {
             ...data.active_agents,
-            change_pct: null,
-            detail: `${agentsPct}% of ${agentsTotal} agents online`,
+            change_pct: agentsTotal ? agentsPct : null,
+            detail: `${agentsPct}% of ${agentsTotal} agents online · heartbeat < 120s`,
           },
           icon: "Radio",
+          tone: "ok",
           spark: data.agent_health.map((a) => Math.round(a.events_per_sec)),
         },
         {
           kpi: data.monitored_units,
           icon: "Building2",
+          tone: "neutral",
           spark: data.units.map((u) => u.events),
         },
         {
@@ -112,10 +125,11 @@ export default function DashboardPage() {
             value: openIncidents?.total ?? 0,
             change_pct: null,
             compare_label: "open",
-            detail: `${openIncidents?.critical ?? 0} requiring attention`,
+            detail: `${openIncidents?.critical ?? 0} critical needing attention`,
             status: openIncidents && openIncidents.critical > 0 ? "critical" : "ok",
           },
           icon: "Siren",
+          tone: openIncidents && openIncidents.critical > 0 ? "critical" : "ok",
           valueClassName: openIncidents && openIncidents.critical > 0 ? "text-critical" : "text-foreground",
           spark: data.units.map((u) => u.alerts),
         },
@@ -123,10 +137,10 @@ export default function DashboardPage() {
     : [];
 
   return (
-    <div>
+    <div className="scanline-bg">
       <PageHeader
         title="Command Center"
-        description={`Real-time posture across all deployed units and Windows agents · Welcome back, ${user?.full_name?.split(" ")[0] ?? "Analyst"}`}
+        description={description}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SimulateAttackButton />
@@ -158,14 +172,16 @@ export default function DashboardPage() {
         }
       />
 
+      <OpsStrip generatedAt={data?.generated_at} />
+
       {isLoading && <PageLoading rows={8} />}
       {isError && <PageError message={(error as Error)?.message} onRetry={() => refetch()} />}
 
       {data && (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            {kpis.map(({ kpi, icon, spark, valueClassName }) => (
-              <KpiCard key={kpi.label} kpi={kpi} icon={icon} spark={spark} valueClassName={valueClassName} />
+            {kpis.map(({ kpi, icon, tone, spark, valueClassName }) => (
+              <KpiCard key={kpi.label} kpi={kpi} icon={icon} spark={spark} tone={tone} valueClassName={valueClassName} />
             ))}
           </div>
 
@@ -177,7 +193,7 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className="xl:col-span-2">
-              <TimelineChart data={data.timeline} />
+              <TimelineChart data={data.timeline} period={period} />
             </div>
             <SeverityDonut data={data.severity} />
           </div>
@@ -194,6 +210,14 @@ export default function DashboardPage() {
           </div>
 
           <TopRulesTable rules={data.top_rules} />
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-surface3/60 px-4 py-2 text-[10px] text-muted">
+            <span>
+              All figures on this screen are generated from synthetic demo traffic — but routed through the{" "}
+              <span className="font-mono text-slate-400">same parser → normalize → detect → score</span> pipeline real agents use.
+            </span>
+            <span className="font-mono text-slate-500">SI-16 · IPC WATCH · deployed units: {data.units.length}</span>
+          </div>
         </div>
       )}
     </div>
@@ -273,12 +297,12 @@ function AgentHealthTable({ items }: { items: { id: string; hostname: string; un
                 <TableCell className="text-right font-mono text-xs">{a.events_per_sec.toFixed(1)}</TableCell>
                 <TableCell className="text-right font-mono text-xs">{a.cpu_usage.toFixed(1)}%</TableCell>
                 <TableCell className="text-right font-mono text-xs">{a.memory_usage.toFixed(1)}%</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      <StatusBadge status={a.status} className="text-[9px]" />
-                      {a.simulated && <Badge variant="outline" className="text-[9px]">simulated</Badge>}
-                    </div>
-                  </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge status={a.status} className="text-[9px]" />
+                    {a.simulated && <Badge variant="outline" className="text-[9px]">simulated</Badge>}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -298,31 +322,40 @@ function TopRulesTable({ rules }: { rules: { rule_id: string; name: string; seve
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Rule</TableHead>
-              <TableHead>MITRE</TableHead>
-              <TableHead className="text-right">Matches</TableHead>
-              <TableHead>Severity</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rules.map((r) => (
-              <TableRow key={r.rule_id}>
-                <TableCell>
-                  <span className="font-mono text-[12px] text-accent">{r.rule_id}</span>
-                  <span className="block text-xs text-foreground">{r.name}</span>
-                </TableCell>
-                <TableCell className="font-mono text-xs text-muted">{r.mitre_technique ?? "—"}</TableCell>
-                <TableCell className="text-right font-mono text-xs">{r.times_matched}</TableCell>
-                <TableCell>
-                  <SeverityBadge severity={r.severity} className="text-[9px]" />
-                </TableCell>
+        {rules.length === 0 ? (
+          <div className="flex flex-col items-start gap-1 px-4 py-4 text-left">
+            <p className="text-xs text-muted">No rule matches in this window yet.</p>
+            <p className="text-[11px] text-muted/70">
+              Baseline still warming — run a demo scenario to push matches, or widen the period to 7D/30D.
+            </p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Rule</TableHead>
+                <TableHead>MITRE</TableHead>
+                <TableHead className="text-right">Matches</TableHead>
+                <TableHead>Severity</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rules.map((r) => (
+                <TableRow key={r.rule_id}>
+                  <TableCell>
+                    <span className="font-mono text-[12px] text-accent">{r.rule_id}</span>
+                    <span className="block text-xs text-foreground">{r.name}</span>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted">{r.mitre_technique ?? "—"}</TableCell>
+                  <TableCell className="text-right font-mono text-xs">{r.times_matched}</TableCell>
+                  <TableCell>
+                    <SeverityBadge severity={r.severity} className="text-[9px]" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   );

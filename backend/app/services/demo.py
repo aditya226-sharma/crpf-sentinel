@@ -14,6 +14,8 @@ import hashlib
 import json
 import random
 import logging
+import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -539,3 +541,85 @@ def reset_demo(db: Session) -> dict:
     seed_hero_incidents(db)
     db.commit()
     return {"removed_alerts": removed_alerts, "removed_events": removed_events}
+
+
+def sustain_environment(db: Session) -> dict:
+    """Keep a demo environment looking alive without re-seeding.
+
+    A real fleet reports heartbeats continuously; simulated agents were given a
+    single heartbeat at seed time, so after a few minutes the SOC dashboard
+    reads "0 / N agents online" next to a live event stream — visibly fake.  This
+    refreshes simulated-agent heartbeats with light telemetry jitter and, when no
+    event has landed in the last 90s, trickles a couple of benign 4624 logons so
+    the live stream keeps breathing.  Only ever call this against demo data.
+    """
+    from datetime import datetime as _dt
+
+    now = _dt.now(timezone.utc)
+    enrolled = (
+        db.query(Agent)
+        .filter(Agent.simulated.is_(True), Agent.is_enabled.is_(True))
+        .all()
+    )
+    for a in enrolled:
+        a.last_seen_at = now - timedelta(seconds=random.randint(1, 14))
+        a.status = "online" if a.is_enabled else "disabled"
+        a.cpu_usage = round(max(2.0, min(92.0, a.cpu_usage + random.uniform(-6.0, 6.0))), 1)
+        a.memory_usage = round(max(12.0, min(96.0, a.memory_usage + random.uniform(-3.0, 3.0))), 1)
+
+    trickled = 0
+    recent = (
+        db.query(NormalizedEvent.id)
+        .filter(NormalizedEvent.timestamp >= now - timedelta(seconds=90))
+        .limit(1)
+        .first()
+    )
+    if enrolled and recent is None:
+        agent = random.choice(enrolled)
+        unit = db.query(Unit).filter(Unit.id == agent.unit_id).first()
+        if unit is not None:
+            for _ in range(2):
+                _push(
+                    db, agent, unit, 4624, now + timedelta(seconds=random.randint(0, 2)),
+                    {
+                        "SubjectUserName": random.choice(USERS_POOL),
+                        "IpAddress": "10.0.0.8",
+                        "LogonType": "3",
+                        "WorkstationName": agent.hostname,
+                    },
+                )
+            trickled = 2
+
+    db.commit()
+    return {"agents_heartbeat": len(enrolled), "trickle_events": trickled}
+
+
+def start_sustain_thread(interval: int = 20) -> threading.Thread | None:
+    """Background heartbeat sustainer for demo instances.
+
+    Gated by ``DEMO_KEEPALIVE_ENABLED``; returns None (no-op) otherwise so this
+    can never start against a production deployment.
+    """
+    from app.core.config import get_settings
+    from app.database.session import SessionLocal
+
+    settings = get_settings()
+    # Never let a .env-provided keepalive toggle escape into the test process,
+    # where a stray background thread would race the per-module DB reseeds.
+    if settings.APP_ENV == "test":
+        return None
+    if not settings.DEMO_KEEPALIVE_ENABLED:
+        return None
+
+    def _loop() -> None:
+        while True:
+            time.sleep(interval)
+            try:
+                with SessionLocal() as db:
+                    sustain_environment(db)
+            except Exception as exc:  # noqa: BLE001 - a bad tick must not kill the loop
+                logger.warning("sustain tick failed: %s", exc)
+
+    thread = threading.Thread(target=_loop, name="demo-sustain", daemon=True)
+    thread.start()
+    return thread

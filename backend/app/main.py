@@ -65,6 +65,7 @@ async def on_startup() -> None:
 
         logging.getLogger("cyberrakshak.startup").exception("startup seeding failed: %s", exc)
     _start_osint_poller()
+    _start_demo_sustain()
 
 
 def _start_osint_poller() -> None:
@@ -115,3 +116,17 @@ def _start_osint_poller() -> None:
         start_poller_thread(client, publish_fn=_publish)
     except Exception as exc:  # pragma: no cover - poller must never block startup
         logger.warning("OSINT poller not started: %s", exc)
+
+
+def _start_demo_sustain() -> None:
+    """Keep simulated agents visibly alive in demo instances (opt-in).
+
+    No-op unless DEMO_KEEPALIVE_ENABLED is set, so production is unaffected.
+    """
+    try:
+        from app.services.demo import start_sustain_thread
+
+        start_sustain_thread()
+    except Exception as exc:  # pragma: no cover - sustainer must never block startup
+        logger = logging.getLogger("cyberrakshak.startup")
+        logger.warning("demo sustain thread not started: %s", exc)

@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # Run demo reset in a detached worker thread (avoids hosted-Postgres
     # timeouts) — set alongside SEED_DEMO_DATA in the deployed demo instance.
     DEMO_BACKGROUND_RESET: bool = False
+    # Keep simulated agents visibly alive in a demo instance: a background
+    # thread refreshes their heartbeats and trickles ambient events so the
+    # dashboard never shows "0 / N agents online" a few minutes after seed.
+    # Demo-only — never enable against production data.
+    DEMO_KEEPALIVE_ENABLED: bool = False
     SEED_ADMIN_USERNAME: str = "admin"
     SEED_ADMIN_EMAIL: str = "admin@cyberrakshak.demo"
     SEED_ADMIN_PASSWORD: str = "admin@1234"
