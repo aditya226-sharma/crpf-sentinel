@@ -67,20 +67,30 @@ def test_simulate_is_admin_gated(client: TestClient, admin_headers: dict[str, st
 
 def test_simulate_attack_fires_real_alerts(client: TestClient, admin_headers: dict[str, str]):
     _make_unit(client, admin_headers, "UNIT-99")
-    before = client.get("/api/alerts", headers=admin_headers).json()["items"]
 
     res = client.post("/api/demo/simulate", headers=admin_headers)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["status"] == "ok"
     assert body["alerts_fired"], "expected alerts to fire through the real pipeline"
-
-    after = client.get("/api/alerts", headers=admin_headers).json()["items"]
-    assert len(after) >= len(before), "simulation should add alerts"
+    assert body["backdrop_events"] > 0, "expected recent ambient backdrop to fill window widgets"
+    assert body["iocs_created"] > 0, "expected threat-intel indicators to be seeded"
 
     # The scripted sequence must surface a brute-force/credential alert.
+    after = client.get("/api/alerts", headers=admin_headers).json()["items"]
     titles = {a["title"] for a in after}
     assert any("logon" in t.lower() or "brute" in t.lower() or "credential" in t.lower() for t in titles)
+
+    # The simulation enriches the IOC library with the campaign indicators.
+    iocs = client.get("/api/ioc", headers=admin_headers).json()
+    assert iocs["meta"]["total"] > 0
+    values = {i["value"] for i in iocs["items"]}
+    assert "203.0.113.66" in values
+
+    # Simulate again is idempotent for IOC seeding (same campaign values).
+    res2 = client.post("/api/demo/simulate", headers=admin_headers)
+    assert res2.status_code == 200, res2.text
+    assert res2.json()["iocs_created"] == 0, "IOC seeding must be idempotent"
 
 
 def test_simulate_records_audit(client: TestClient, admin_headers: dict[str, str]):

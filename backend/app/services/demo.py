@@ -10,18 +10,20 @@ scoring), so a judge asking "is this actually running?" always gets an honest
 "yes — this is the real detection path".
 """
 
+import hashlib
 import json
 import random
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 from app.core.security import generate_agent_token
 from app.models.agent import Agent
 from app.models.alert import Alert
 from app.models.event import NormalizedEvent
+from app.models.ioc import IocEntry
 from app.models.log import Log
 from app.models.unit import Unit
 from app.normalization.engine import normalize_event
@@ -99,6 +101,105 @@ def _push(db: Session, agent: Agent, unit: Unit, event_id: int, when: datetime, 
     ingest_payload(db, payload, agent=agent, unit=unit, commit=commit, publish_event=publish_event)
 
 
+def _seed_recent_ambient(db: Session, units: dict[str, Unit], agents: dict[str, Agent],
+                         hours: int = 24) -> int:
+    """Bulk-insert a light ambient 4624/4688 backdrop across the last ``hours``.
+
+    Keeps the 24h dashboard widgets (hourly timeline, top rules, live stream)
+    populated with plausible background traffic after the environment's seed
+    window has aged out, without requiring a full demo reset.
+    """
+    rng = random.Random()
+    now = datetime.now(timezone.utc)
+    unit_codes = list(units.keys())
+    events = 0
+    ambient: list[tuple[datetime, str, str]] = []
+    ambient_unit: dict[tuple[str, int], tuple[Unit, Agent]] = {}
+
+    def _flush(code: str, event_id: int) -> None:
+        nonlocal events, ambient
+        if not ambient:
+            return
+        unit, agent = ambient_unit[(code, event_id)]
+        events += _bulk_ambient(db, agent, unit, event_id, ambient)
+        ambient = []
+
+    for hour in range(hours):
+        slot = now - timedelta(hours=hour)
+        for code in unit_codes:
+            unit, agent = units[code], agents[code]
+            for _ in range(rng.randint(3, 7)):
+                when = slot.replace(minute=rng.randint(0, 59), second=rng.randint(0, 59))
+                ambient.append((when, rng.choice(USERS_POOL), ""))
+            ambient_unit[(code, 4624)] = (unit, agent)
+            _flush(code, 4624)
+            for _ in range(rng.randint(4, 9)):
+                when = slot.replace(minute=rng.randint(0, 59), second=rng.randint(0, 59))
+                ambient.append((when, rng.choice(USERS_POOL),
+                                "C:\\Windows\\System32\\"
+                                + rng.choice(["explorer.exe", "chrome.exe", "winword.exe"])))
+            ambient_unit[(code, 4688)] = (unit, agent)
+            _flush(code, 4688)
+    return events
+
+
+def _next_ioc_id() -> str:
+    return f"IOC-{datetime.now(timezone.utc):%y%m%d}-{uuid.uuid4().hex[:6].upper()}"
+
+
+def _upsert_ioc(db: Session, ioc_type: str, value: str, description: str,
+                source: str, severity: str, threat_type: str) -> bool:
+    """Record an indicator of compromise idempotently. Returns True if created."""
+    normalized = value.strip().lower()
+    exists = (
+        db.query(IocEntry)
+        .filter(IocEntry.ioc_type == ioc_type, func.lower(IocEntry.value) == normalized)
+        .first()
+    )
+    if exists is not None:
+        return False
+    db.add(IocEntry(
+        id=uuid.uuid4().hex[:16],
+        ioc_id=_next_ioc_id(),
+        ioc_type=ioc_type,
+        value=normalized,
+        description=description,
+        source=source,
+        severity=severity,
+        threat_type=threat_type,
+        status="enabled",
+    ))
+    return True
+
+
+def _seed_demo_iocs(db: Session) -> int:
+    """Seed the indicator-of-compromise library with campaign artefacts (idempotent)."""
+    ATTACK_POWERSHELL_CMD = (
+        "powershell.exe -nop -w hidden -enc SQBFAFgAKAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA"
+    )
+    payload_hash = hashlib.sha256(ATTACK_POWERSHELL_CMD.encode()).hexdigest()
+    created = 0
+    created += int(_upsert_ioc(db, "ip", "203.0.113.66",
+        "Reconnaissance / initial-access source observed in failed-logon bursts and VPN logon.",
+        "demo_sim", "high", "recon"))
+    created += int(_upsert_ioc(db, "ip", "198.51.100.7",
+        "Brute-force source: repeated 4625 failed logons across multiple units.",
+        "demo_sim", "high", "brute_force"))
+    created += int(_upsert_ioc(db, "ip", "10.20.30.41",
+        "Internal pivot host used for lateral movement (4648/4624 credential reuse).",
+        "demo_sim", "high", "lateral_movement"))
+    created += int(_upsert_ioc(db, "domain", "c2sync.example-labs.in",
+        "Suspected command-and-control rendezvous domain for exfiltration tooling.",
+        "demo_sim", "critical", "c2"))
+    created += int(_upsert_ioc(db, "hash", payload_hash,
+        "SHA-256 of the encoded PowerShell download cradle observed on exfil host.",
+        "demo_sim", "critical", "payload"))
+    created += int(_upsert_ioc(db, "command", ATTACK_POWERSHELL_CMD,
+        "Encoded PowerShell one-liner attempting IEX(New-Object Net.WebClient).DownloadString.",
+        "demo_sim", "critical", "exfiltration"))
+    return created
+
+
 def simulate_attack(db: Session, scenario: str = "espionage") -> dict:
     """Replay a scripted multi-stage synthetic attack through the real pipeline."""
     units = {u.unit_code: u for u in db.query(Unit).all()}
@@ -107,6 +208,7 @@ def simulate_attack(db: Session, scenario: str = "espionage") -> dict:
     agents = ensure_sim_agents(db, units)
 
     now = datetime.now(timezone.utc)
+    backdrop_events = _seed_recent_ambient(db, units, agents)
     deltas = [timedelta(seconds=d) for d in (0, 2, 5, 9, 14, 20, 27, 35, 44, 54, 65)]
     unit_codes = list(units.keys())
     picked = unit_codes[: max(2, min(len(unit_codes), 3))]
@@ -164,12 +266,19 @@ def simulate_attack(db: Session, scenario: str = "espionage") -> dict:
         .order_by(Alert.created_at.asc())
         .all()
     )
+
+    iocs_created = _seed_demo_iocs(db)
+    db.commit()
+
     return {
         "status": "ok",
         "scenario": scenario,
         "phases": ["recon", "initial_access", "privilege_escalation", "lateral_movement",
                    "persistence", "defence_evasion", "exfiltration", "persistence_account"],
-        "events_ingested": 11,
+        "events_ingested": 11 + backdrop_events,
+        "attack_events": 11,
+        "backdrop_events": backdrop_events,
+        "iocs_created": iocs_created,
         "alerts_fired": [
             {
                 "id": a.alert_id,
@@ -307,7 +416,9 @@ def seed_demo_log_data(db: Session) -> dict:
             events += 1
 
     db.commit()
-    return {"events_seeded": events, "bursts": bursts}
+    iocs_created = _seed_demo_iocs(db)
+    db.commit()
+    return {"events_seeded": events, "bursts": bursts, "iocs_created": iocs_created}
 
 
 def seed_hero_incidents(db: Session) -> int:
