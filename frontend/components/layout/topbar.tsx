@@ -34,7 +34,6 @@ const connectionVariant = {
 } as const;
 
 const PAGE_TITLES: Record<string, { section: string; page: string }> = {
-  "/criminal": { section: "CRIMINAL INTELLIGENCE", page: "Network Map" },
   "/dashboard": { section: "LOG INTELLIGENCE", page: "Command Center" },
   "/live-events": { section: "LOG INTELLIGENCE", page: "Live Events" },
   "/logs": { section: "MONITORING", page: "Log Explorer" },

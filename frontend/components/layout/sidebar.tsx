@@ -24,7 +24,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Gauge,
-  Fingerprint,
   LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
@@ -53,12 +52,6 @@ const navGroups: { title: string; items: NavItem[] }[] = [
     title: "Workspaces",
     items: [
       { href: "/", label: "Dashboard Select", icon: LayoutGrid },
-    ],
-  },
-  {
-    title: "Criminal Intelligence",
-    items: [
-      { href: "/criminal", label: "Network Map", icon: Fingerprint, permissions: ["graph.view"] },
     ],
   },
   {
@@ -114,7 +107,6 @@ const navGroups: { title: string; items: NavItem[] }[] = [
 ];
 
 const SECTION_LABELS: Record<string, string> = {
-  "/criminal": "CRIMINAL INTELLIGENCE",
   "/dashboard": "LOG INTELLIGENCE",
   "/live-events": "COMMAND CENTER",
   "/logs": "MONITORING",

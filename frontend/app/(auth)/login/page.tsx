@@ -10,8 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
-import { ApiError, getStoredUser } from "@/lib/api";
-import type { User as UserProfile } from "@/types";
+import { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
   return (
@@ -80,9 +79,7 @@ function LoginForm() {
       const fromParam = searchParams.get("from");
       const fromValid =
         fromParam && fromParam.startsWith("/") && !fromParam.startsWith("//");
-      const me = getStoredUser<UserProfile>();
-      const roleTarget =
-        me?.role?.default_dashboard === "criminal" ? "/criminal" : "/dashboard";
+      const roleTarget = "/dashboard";
       router.replace(fromValid ? fromParam : roleTarget);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Unable to sign in. Check your credentials.";
